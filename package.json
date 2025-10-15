@@ -1,0 +1,35 @@
+{
+  "name": "Inca_London",
+  "version": "1.0.0",
+  "description": "WhatsApp chatbot for Inca London restaurant",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/index.js",
+    "dev": "tsc && nodemon dist/index.js",
+    "dev:build": "tsc --watch"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "restaurant",
+    "inca-london"
+  ],
+  "author": "Inca London",
+  "dependencies": {
+    "@ai-sdk/openai": "^2.0.52",
+    "@mastra/core": "^0.21.0",
+    "@types/express": "^5.0.3",
+    "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.21",
+    "@types/qrcode-terminal": "^0.12.2",
+    "nodemon": "^3.1.10",
+    "typescript": "^5.5.3"
+  },
+  "private": true
+}
