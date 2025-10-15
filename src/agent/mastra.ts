@@ -141,9 +141,9 @@ GESTION IMPORTANTE DU MENU :
 - Pour le menu Wagyu : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_bb9f24cd9a61499bbde31da9841bfb2e.pdf
 - Pour la carte des vins : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_20753e61bce346538f8868a1485acfd9.pdf
 - Pour le menu boissons/cocktails : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_eddf185fa8384622b45ff682b4d14f76.pdf
-- Ne fournis JAMAIS l'URL complète du menu dans ta réponse, il faut envoyer le PDF directement et permettre à l'utilisateur de le consulter en cliquant.
-- Format pour les menus : Envoie juste le fichier et RIEN d'autre. Ne dis pas "Voici le menu" ou "Tu peux trouver le menu ici". Envoie juste le PDF et RIEN d'autre.
-- N'oublie pas de mentionner les options végétariennes et sans gluten sur demande
+- FORMAT STRICTE pour les réponses de menu : Ta réponse DOIT contenir UNIQUEMENT l'URL du PDF et RIEN d'autre. Pas de texte avant, pas de texte après, juste l'URL complète du PDF. Le système se chargera d'envoyer le PDF avec un message approprié dans la langue de l'utilisateur.
+- Exemple de réponse correcte quand on demande le menu : "https://www.incalondon.com/_files/ugd/325c3c_bdde0eb515e54beeba08ce662f63b801.pdf"
+- N'oublie pas de mentionner les options végétariennes et sans gluten sur demande SEULEMENT si l'utilisateur pose une question spécifique sur les options alimentaires
 
 ### Divertissement
 - Décrire le dîner-spectacle immersif
@@ -280,9 +280,10 @@ export async function processUserMessage(
       }
     }
 
-    // if(menusToSend.length > 0) {
-    //     responseText = "⁠";
-    // }
+    // Si des menus sont détectés, on vide le texte de réponse car le webhook gérera le message
+    if(menusToSend.length > 0) {
+        responseText = "";
+    }
 
   console.log("TEXT TEXT : ", responseText, " MENUS : ", menusToSend);
 

@@ -16,6 +16,79 @@ const processedMessages = new Set<string>();
 const MESSAGE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
+ * Détecte la langue d'un message utilisateur
+ */
+function detectLanguage(message: string): string {
+  const lowerMessage = message.toLowerCase();
+
+  // Mots-clés français
+  const frenchKeywords = ['menu', 'bonjour', 'salut', 'merci', 'carte', 'vin', 'vins', 'wagyu', 'plat', 'plats'];
+  // Mots-clés anglais
+  const englishKeywords = ['hello', 'hi', 'thanks', 'thank', 'wine', 'dish', 'dishes', 'drink'];
+  // Mots-clés espagnols
+  const spanishKeywords = ['hola', 'gracias', 'vino', 'menú', 'bebida', 'comida'];
+
+  let frenchScore = 0;
+  let englishScore = 0;
+  let spanishScore = 0;
+
+  frenchKeywords.forEach(keyword => {
+    if (lowerMessage.includes(keyword)) frenchScore++;
+  });
+
+  englishKeywords.forEach(keyword => {
+    if (lowerMessage.includes(keyword)) englishScore++;
+  });
+
+  spanishKeywords.forEach(keyword => {
+    if (lowerMessage.includes(keyword)) spanishScore++;
+  });
+
+  // Par défaut anglais si aucune détection
+  if (frenchScore === 0 && englishScore === 0 && spanishScore === 0) {
+    return 'en';
+  }
+
+  if (frenchScore >= englishScore && frenchScore >= spanishScore) {
+    return 'fr';
+  } else if (spanishScore > englishScore) {
+    return 'es';
+  }
+
+  return 'en';
+}
+
+/**
+ * Génère un message minimal pour accompagner l'envoi d'un menu
+ */
+function getMenuMessage(menuType: string, language: string): string {
+  const messages: Record<string, Record<string, string>> = {
+    'alacarte': {
+      'fr': 'Voici le menu à la carte',
+      'en': 'Here is the à la carte menu',
+      'es': 'Aquí está el menú a la carta'
+    },
+    'wagyu': {
+      'fr': 'Voici le menu Wagyu',
+      'en': 'Here is the Wagyu menu',
+      'es': 'Aquí está el menú Wagyu'
+    },
+    'wine': {
+      'fr': 'Voici la carte des vins',
+      'en': 'Here is the wine menu',
+      'es': 'Aquí está la carta de vinos'
+    },
+    'drinks': {
+      'fr': 'Voici le menu boissons',
+      'en': 'Here is the drinks menu',
+      'es': 'Aquí está el menú de bebidas'
+    }
+  };
+
+  return messages[menuType]?.[language] || messages[menuType]?.['en'] || '';
+}
+
+/**
  * WhatsApp webhook message structure from Meta
  */
 interface WhatsAppWebhookMessage {
@@ -169,29 +242,38 @@ async function processIncomingMessage(
     // Process message through Mastra agent
     const agentResponse = await processUserMessage(mastra, userMessage, userId);
 
-    // If there are menus to send, send them as documents first
+    // Détecter la langue de l'utilisateur
+    const userLanguage = detectLanguage(userMessage);
+
+    // If there are menus to send, send them as documents with minimal message
     if (agentResponse.menusToSend && agentResponse.menusToSend.length > 0) {
-      console.log(`📋 Sending ${agentResponse.menusToSend.length} menu PDF(s)`);
+      console.log(`📋 Sending ${agentResponse.menusToSend.length} menu PDF(s) in language: ${userLanguage}`);
 
       for (const menu of agentResponse.menusToSend) {
         try {
+          // Générer le message minimal dans la langue de l'utilisateur
+          const menuMessage = getMenuMessage(menu.type, userLanguage);
+
           await whatsappClient.sendDocument(
             userId,
             menu.url,
             `${menu.name}.pdf`,
-            menu.name
+            menuMessage // Utiliser le message minimal au lieu de menu.name
           );
-          console.log(`✅ Sent ${menu.name} PDF to ${userId}`);
+          console.log(`✅ Sent ${menu.name} PDF to ${userId} with message: "${menuMessage}"`);
         } catch (error) {
           console.error(`❌ Failed to send ${menu.name} PDF:`, error);
         }
       }
     }
 
-    // Send response back to user (text message)
-    await whatsappClient.sendTextMessage(userId, agentResponse.text);
+    // Send response back to user (text message) only if there's text
+    if (agentResponse.text && agentResponse.text.trim().length > 0) {
+      await whatsappClient.sendTextMessage(userId, agentResponse.text);
+      console.log(`✅ Text response sent to ${userId}`);
+    }
 
-    console.log(`✅ Response sent to ${userId}`);
+    console.log(`✅ Processing complete for ${userId}`);
   } catch (error: any) {
     console.error('❌ Error processing incoming message:', error);
 
