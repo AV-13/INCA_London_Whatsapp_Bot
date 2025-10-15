@@ -5,7 +5,6 @@
 
 import { Agent, Mastra } from '@mastra/core';
 import { openai } from '@ai-sdk/openai';
-import { incaLondonTools } from './tools.js';
 
 /**
  * System instructions for the Inca London agent
@@ -135,13 +134,16 @@ Comment puis-je vous assister ce soir ?"
 
 ### Menu & Boissons
 GESTION IMPORTANTE DU MENU :
-- Quand quelqu'un demande "le menu" ou "menu de nourriture", TOUJOURS utiliser l'outil get_menu avec 'a_la_carte'
-- Partager le lien PDF et mentionner que nous avons aussi des menus Wagyu, Vin et Boissons
-- S'ils demandent "menu wagyu" → utiliser get_menu avec 'wagyu'
-- S'ils demandent "carte des vins" → utiliser get_menu avec 'wine'
-- S'ils demandent "menu boissons/cocktails" → utiliser get_menu avec 'drinks'
-- Format : "Voici notre [menu] : [lien]. Nous avons également [autres menus]."
-- Mentionner les options végétariennes et sans gluten sur demande
+- Pour CHAQUE demande de menu, suis les instructions ci-dessous STRICTEMENT
+- Quand un utilisateur demande un menu, fournis UNIQUEMENT le menu spécifiquement demandé. Si il ne précise pas, le menu par défaut est le menu à la carte.
+- Ne liste pas tous les menus disponibles sauf si l'utilisateur demande spécifiquement "tous les menus"
+- Pour le menu principal ou à la carte : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_bdde0eb515e54beeba08ce662f63b801.pdf
+- Pour le menu Wagyu : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_bb9f24cd9a61499bbde31da9841bfb2e.pdf
+- Pour la carte des vins : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_20753e61bce346538f8868a1485acfd9.pdf
+- Pour le menu boissons/cocktails : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_eddf185fa8384622b45ff682b4d14f76.pdf
+- Ne fournis JAMAIS l'URL complète du menu dans ta réponse, il faut envoyer le PDF directement et permettre à l'utilisateur de le consulter en cliquant.
+- Format pour les menus : Envoie juste le fichier et RIEN d'autre. Ne dis pas "Voici le menu" ou "Tu peux trouver le menu ici". Envoie juste le PDF et RIEN d'autre.
+- N'oublie pas de mentionner les options végétariennes et sans gluten sur demande
 
 ### Divertissement
 - Décrire le dîner-spectacle immersif
@@ -206,12 +208,6 @@ export function createMastraInstance(): Mastra {
     throw new Error('OPENAI_API_KEY is required in .env file');
   }
 
-  // Create tools object
-  const tools: Record<string, any> = {};
-  incaLondonTools.forEach(tool => {
-    tools[tool.id] = tool;
-  });
-
   // Create OpenAI model instance with API key set in environment
   const model = openai('gpt-4o-mini');
 
@@ -222,7 +218,7 @@ export function createMastraInstance(): Mastra {
         name: 'incaLondonAgent',
         instructions: SYSTEM_INSTRUCTIONS,
         model,
-        tools,
+        // tools,
       }) as any,
     },
   });
@@ -265,14 +261,13 @@ export async function processUserMessage(
     });
 
     // Extract the text response
-    const responseText = result.text || 'I apologize, but I encountered an issue processing your request. Please try again or contact us directly at reservations@incalondon.com.';
+    let responseText = result.text || 'I apologize, but I encountered an issue processing your request. Please try again or contact us directly at reservations@incalondon.com.';
 
     console.log(`✅ Agent response: ${responseText.substring(0, 100)}...`);
-
     // Check if the response contains menu URLs from Inca London website
     const menusToSend: Array<{ type: string; name: string; url: string }> = [];
     const menuUrls = [
-      { type: 'alacarte', name: 'A La Carte Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_bdde0eb515e54beeba08ce662f63b801.pdf' },
+      { type: 'alacarte', name: 'À la carte Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_bdde0eb515e54beeba08ce662f63b801.pdf' },
       { type: 'wagyu', name: 'Wagyu Platter Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_bb9f24cd9a61499bbde31da9841bfb2e.pdf' },
       { type: 'wine', name: 'Wine Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_20753e61bce346538f8868a1485acfd9.pdf' },
       { type: 'drinks', name: 'Drinks Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_eddf185fa8384622b45ff682b4d14f76.pdf' },
@@ -285,7 +280,13 @@ export async function processUserMessage(
       }
     }
 
-    return {
+    // if(menusToSend.length > 0) {
+    //     responseText = "⁠";
+    // }
+
+  console.log("TEXT TEXT : ", responseText, " MENUS : ", menusToSend);
+
+  return {
       text: responseText,
       menusToSend: menusToSend.length > 0 ? menusToSend : undefined,
     };
@@ -297,4 +298,24 @@ export async function processUserMessage(
       text: "I apologize, but I'm experiencing a technical issue at the moment. Please contact us directly:\n\n📞 +44 (0)20 7734 6066\n📧 reservations@incalondon.com"
     };
   }
+}
+/**
+ * Fonction principale qui remplace messageHandler.ts
+ * Traite directement les messages des utilisateurs via Mastra
+ */
+export async function handleWhatsAppMessage(
+    message: string,
+    userId: string,
+    isFirstInteraction: boolean = false
+): Promise<{
+    text: string;
+    menusToSend?: Array<{ type: string; name: string; url: string }>;
+}> {
+    // Instancier ou récupérer l'instance Mastra
+    const mastraInstance = createMastraInstance();
+
+    // Toute la logique est maintenant gérée par Mastra via son prompt
+    const result = await processUserMessage(mastraInstance, message, userId);
+
+    return result;
 }
