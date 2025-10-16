@@ -74,3 +74,124 @@ J'aimerais utiliser les boutons interactifs de whatsApp Business pour gérer dif
   - Il faut aussi documenter au maximum le code (jsdoc) et faire un README complet et détaillé.
 
 context seven pour les docs des outils.
+
+
+Actuellement, énormément de choses sont hardcodées en anglais dans le code, il faut tout rendre dynamique et multi-lingue. Pour ça, il faut à chaque fois passer par l'IA qui est extrémement performante pour générer du texte dans tout type de langues.
+Cela passe aussi par retirer le dictionnaire dans webhook.ts qui ne prend en compte que certaines langues (5 à 6) alors que je veux que mon bot puisse s'exprimer dans chaque langue.
+Aussi, pour chaque formulaire ou WhatsApp Flows (menus, réservation) Il faut laisser l'IA générer le texte dans la langue de l'utilisateur pour accompagner chaque étape du "formulaire".
+Ou chaque label accompagnant les boutons interactifs/document.
+Il faut aussi ajouter whisper pour gérer le speech to text et ensuite traiter le texte comme un message classique.
+Il faut ajouter une map pour gérer la location proprement et accompagner la demande d'adresse précise.
+Pour la date on peut inclure un datepicker via whatsapp flow : {
+"version": "7.2",
+"data_api_version": "3.0",
+"routing_model": {},
+"screens": [
+{
+"id": "DEMO_SCREEN",
+"terminal": true,
+"title": "Demo screen",
+"layout": {
+"type": "SingleColumnLayout",
+"children": [
+{
+"type": "DatePicker",
+"name": "date",
+"label": "Date",
+"min-date": "2024-10-21",
+"max-date": "2024-11-12",
+"unavailable-dates": [
+"2024-10-28",
+"2024-11-01"
+],
+"on-select-action": {
+"name": "data_exchange",
+"payload": {
+"date": "${form.date}"
+}
+}
+},
+{
+"type": "Footer",
+"label": "Continue",
+"on-click-action": {
+"name": "data_exchange",
+"payload": {}
+}
+}
+]
+}
+}
+]
+}On va pas passer par google map API pour la location on va juste renvoyer une réponse avec whatsapp: extrait de l'API :
+{
+"messaging_product": "whatsapp",
+"recipient_type": "individual",
+"to": "<WHATSAPP_USER_PHONE_NUMBER>",
+"type": "location",
+"location": {
+"latitude": "<LOCATION_LATITUDE>",
+"longitude": "<LOCATION_LONGITUDE>",
+"name": "<LOCATION_NAME>",
+"address": "<LOCATION_ADDRESS>"
+}
+}'
+
+Quand on demande l'adresse, accompagne la d'une localisation whatsapp avec les longitudes et latitudes suivantes :
+Latitude : 51.514682
+Longitude: -0.140592
+Actuellement, on a juste un message qui renvoie l'adresse à l'écrit, et pas la localisation exacte via une carte (whatsapp location) qui va avec.
+
+🌍 Detected language: fr for message: "Je veux resa une table..."
+🌍 Generated text for "date_picker_prompt" in fr: "Veuillez sélectionner une date pour votre réservation."
+🌍 Generated text for "date_picker_button" in fr: "Sélectionner une date"
+🌍 Generated text for "The phrase "This Week" (2-3 words)" in fr: "Cette semaine"
+🌍 Generated text for "The phrase "Next Week" (2-3 words)" in fr: "La semaine prochaine"
+🌍 Generated text for "The phrase "Week 3" (2-3 words)" in fr: "Semaine 3"
+🌍 Generated text for "The phrase "Week 4" (2-3 words)" in fr: "Semaine 4"
+📤 Sending interactive list to 33649712311
+❌ Error sending interactive list: {
+error: {
+message: '(#131009) Parameter value is not valid',
+type: 'OAuthException',
+code: 131009,
+error_data: {
+messaging_product: 'whatsapp',
+details: 'Button label is too long. Max length is 20'                                                                                                                         
+},
+fbtrace_id: 'AV58I0yAx_-tdwVY4fnz5_Y'                                                                                                                                           
+}
+}
+❌ Error processing incoming message: Error: Failed to send interactive list: Request failed with status code 400
+at WhatsAppClient.sendInteractiveList (file:///C:/Users/augus/WebstormProjects/Inca_London/dist/whatsapp/client.js:174:19)                                                      
+at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+at async sendDateRequest (file:///C:/Users/augus/WebstormProjects/Inca_London/dist/whatsapp/webhook.js:365:5)                                                                   
+at async handleReservationButtonClick (file:///C:/Users/augus/WebstormProjects/Inca_London/dist/whatsapp/webhook.js:447:9)                                                      
+at async processIncomingMessage (file:///C:/Users/augus/WebstormProjects/Inca_London/dist/whatsapp/webhook.js:628:13)                                                           
+at async handleWebhook (file:///C:/Users/augus/WebstormProjects/Inca_London/dist/whatsapp/webhook.js:106:25)                                                                    
+at async file:///C:/Users/augus/WebstormProjects/Inca_London/dist/index.js:74:5
+🌍 Generated text for "Apologize for a technical issue and provide contact information: Phone: +44 (0)20 7734 6066, Email: reservations@incalondon.com" in en: "We apologize for the technical issue. Please contact us at Phone: +44 (0)20 7734 6066, Email: reservations@incalondon.com."
+📤 Sending message to 33649712311: We apologize for the technical issue. Please conta...
+✅ Message sent successfully
+[2025-10-16T14:35:56.782Z] POST /webhook
+📊 Message status update: sent for message wamid.HBgLMzM2NDk3MTIzMTEVAgARGBI3RkU4NDkzRDQ2NzM3Qjk5NjAA
+[2025-10-16T14:35:57.315Z] POST /webhook
+📊 Message status update: read for message wamid.HBgLMzM2NDk3MTIzMTEVAgARGBI3RkU4NDkzRDQ2NzM3Qjk5NjAA
+[2025-10-16T14:35:57.474Z] POST /webhook
+📊 Message status update: delivered for message wamid.HBgLMzM2NDk3MTIzMTEVAgARGBI3RkU4NDkzRDQ2NzM3Qjk5NjAA
+J'ai un problème avec le datepicker, la manière dont c'est fait génère des bugs
+
+Aussi, Enlever les - dans les forms, affiche juste les labels
+
+au bout d'1 heure => envoyer un message si pas de réponses.
+1h en plus => fermer la conversation automatiquement.
+
+
+🌍 Detected language: fr for message: "Je veux resa une table..."
+🌍 Generated text for "Ask how many people they want to reserve for" in fr: "Pour combien de personnes souhaitez-vous faire une réservation ?"
+🌍 Generated text for "Button text for "Choose" or "Select" (1-2 words)" in fr: "Choisir"
+🌍 Generated text for "The word "People" or "Guests" (1 word)" in fr: "Invités"
+
+
+Réponse à tout les demandes dans le cas d'un message assez long.
+Ne pas se mélanger dans les demandes. bien répondre au prompt de l'utilisateur.

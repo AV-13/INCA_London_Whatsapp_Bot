@@ -1,5 +1,261 @@
 # Changelog - Inca London WhatsApp Bot
 
+## [3.0.0] - 2025-10-16
+
+### 🎉 Major Features - Complete Overhaul
+
+#### 1. 🌍 Complete Multilingual System (AI-Powered)
+- **REMOVED** Hardcoded translation dictionary (130+ lines deleted)
+- **ADDED** Dynamic AI-powered translation system (`src/i18n/dynamicTranslation.ts`)
+- **UPGRADED** Language support from 6 languages → Unlimited (100+ languages)
+- **FIXED** Language detection for button clicks (no longer breaks context)
+- **ADDED** Smart language detection from conversation history
+- **REMOVED** Language caching (allows mid-conversation language switching)
+
+#### 2. 🎤 Whisper Speech-to-Text Integration
+- **ADDED** Full audio message transcription via OpenAI Whisper (`src/audio/whisper.ts`)
+- **ADDED** Support for voice notes and audio files
+- **ADDED** Automatic language hint for better transcription
+- **ADDED** User-friendly transcription confirmation messages
+- **ADDED** Automatic cleanup of temporary audio files
+- **ADDED** Multilingual error handling for transcription failures
+
+#### 3. 📍 Google Maps Location Integration
+- **ADDED** Location message handling (`src/location/maps.ts`)
+- **ADDED** Distance calculation using Haversine formula
+- **ADDED** Google Maps directions URL generation
+- **ADDED** Personalized messages based on distance
+- **ADDED** Multilingual location responses
+- **ADDED** Restaurant location sharing capability
+
+### 🔄 Breaking Changes
+
+#### webhook.ts - Complete Refactor
+- **REMOVED** `TRANSLATIONS` dictionary (lines 26-123)
+- **REMOVED** `translate()` function
+- **REMOVED** `getMenuMessage()` function
+- **REMOVED** Static language cache
+- **ADDED** `detectUserLanguage()` with conversation history support
+- **ADDED** Audio/voice message type handling
+- **ADDED** Location message type handling
+- **UPDATED** All UI generation functions to use AI
+- **FIXED** Button clicks preserving user's language
+
+#### New Message Types Supported
+```typescript
+// Added to WhatsAppWebhookMessage interface
+audio?: {
+  id: string;
+  mime_type: string;
+};
+voice?: {
+  id: string;
+  mime_type: string;
+};
+location?: {
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
+};
+```
+
+### 📦 New Files Created
+
+#### Core Modules
+- `src/i18n/dynamicTranslation.ts` (243 lines)
+  - `generateText()` - Generate any text in any language
+  - `generateMenuMessage()` - Menu PDF accompaniment messages
+  - `generatePrompt()` - Interactive button/list prompts
+  - `generateReservationConfirmation()` - Booking confirmations
+  - `generateErrorMessage()` - Error messages
+  - `generateListLabels()` - Translate list items
+
+- `src/audio/whisper.ts` (180 lines)
+  - `processAudioMessage()` - Complete audio processing pipeline
+  - `downloadAudioFile()` - Download from WhatsApp
+  - `transcribeAudio()` - Whisper transcription
+  - `getMediaUrl()` - Fetch media URL from ID
+
+- `src/location/maps.ts` (165 lines)
+  - `generateLocationResponse()` - Personalized location responses
+  - `calculateDistance()` - Haversine distance calculation
+  - `getDirectionsUrl()` - Google Maps directions
+  - `getStaticMapUrl()` - Static map images (optional)
+  - `getRestaurantLocationMessage()` - Share restaurant location
+
+#### Documentation
+- `MULTILINGUAL_REFACTOR.md` - Technical refactoring documentation
+- `FEATURE_SUMMARY.md` - Complete feature overview
+- `TESTING_GUIDE.md` - Comprehensive testing scenarios
+- `CHANGELOG.md` - This file (updated)
+
+### 🛠️ Technical Improvements
+
+#### Language Detection
+**Before:**
+```typescript
+// Detected from button IDs → broke language context
+const lang = await detectLanguageWithMastra(mastra, 'reservation_party_2');
+// Returns: 'en' (wrong!)
+```
+
+**After:**
+```typescript
+// Intelligent detection from conversation history
+const lang = await detectUserLanguage(userId, buttonId, mastra, history);
+// Finds last real text message, ignores button IDs
+// Returns: 'fr' (correct!)
+```
+
+#### Audio Processing Flow
+```
+1. User sends voice note
+2. Bot receives audio message ID
+3. Fetch media URL from WhatsApp
+4. Download audio file to temp directory
+5. Detect user's language from history
+6. Transcribe with Whisper (with language hint)
+7. Send confirmation: "🎤 J'ai entendu : [text]"
+8. Process transcribed text as normal message
+9. Cleanup temp file
+```
+
+#### Location Processing Flow
+```
+1. User shares location (lat, lon)
+2. Bot detects user's language
+3. Calculate distance to restaurant
+4. Generate personalized message based on distance
+5. Create Google Maps directions URL
+6. Send response with address + directions
+```
+
+### 📊 Performance Metrics
+
+#### Language Support
+- **Before**: 6 languages (hardcoded)
+- **After**: Unlimited (all languages supported by AI)
+
+#### Code Reduction
+- **Removed**: 130+ lines of hardcoded translations
+- **Added**: 591 lines of dynamic, reusable code
+
+#### Message Types
+- **Before**: `text`, `interactive`
+- **After**: `text`, `interactive`, `audio`, `voice`, `location`
+
+### 🔧 Configuration Changes
+
+#### New Environment Variables
+```env
+# Optional - for static maps only
+# Bot works WITHOUT this using public Google Maps links
+GOOGLE_MAPS_API_KEY=your_api_key_here
+```
+
+#### New Dependencies
+```json
+{
+  "openai": "^4.x.x"  // For Whisper API
+}
+```
+
+### 🐛 Bug Fixes
+
+- **FIXED** Language detection breaking on button clicks
+- **FIXED** Hardcoded English fallbacks throughout codebase
+- **FIXED** Limited language support (6 → unlimited)
+- **FIXED** Language cache preventing mid-conversation language changes
+- **FIXED** Button interactions resetting conversation language
+
+### 🎯 Examples
+
+#### Example 1: Multilingual Button Flow (FIXED)
+```
+User: "Bonjour" (French)
+Bot: [Response in French]
+User: "Je voudrais réserver" (French)
+Bot: [Shows party size buttons in French]
+User: [Clicks "2 personnes"] ← Button ID in French
+Bot: [Continues in French] ← FIXED! No longer switches to English
+```
+
+#### Example 2: Voice Note Transcription
+```
+User: [Sends voice note in Spanish]
+      "Hola, quiero hacer una reserva para cuatro personas"
+Bot: "🎤 Escuché: Hola, quiero hacer una reserva para cuatro personas"
+Bot: [Starts reservation flow in Spanish]
+```
+
+#### Example 3: Location Sharing
+```
+User: [Shares location 2.5km away]
+Bot: "¡Gracias por compartir tu ubicación! Estás a 2.5km de Inca London.
+
+      Nuestra dirección: 8-9 Argyll Street, Soho, London W1F 7TF
+      Metro más cercano: Oxford Circus (2 min a pie)
+
+      📍 Direcciones:
+      https://www.google.com/maps/dir/?api=1&origin=..."
+```
+
+### 🧪 Testing
+
+#### Compilation
+- ✅ All TypeScript compilation errors resolved
+- ✅ No type errors
+- ✅ Build successful
+
+#### Integration Tests Needed
+- [ ] Voice note in multiple languages
+- [ ] Location sharing with various distances
+- [ ] Button clicks preserving language
+- [ ] Mid-conversation language switching
+- [ ] Error handling for failed transcriptions
+
+### 📚 Documentation Updates
+
+- **ADDED** `MULTILINGUAL_REFACTOR.md` - Technical deep-dive
+- **ADDED** `FEATURE_SUMMARY.md` - Feature showcase
+- **ADDED** `TESTING_GUIDE.md` - Test scenarios and checklists
+- **UPDATED** `.env.example` - Added Google Maps API key
+- **UPDATED** `CHANGELOG.md` - This comprehensive changelog
+
+### 🚀 Migration from v2.x
+
+No breaking changes for end users. To upgrade:
+
+```bash
+# 1. Pull latest code
+git pull
+
+# 2. Install new dependencies
+npm install
+
+# 3. Rebuild
+npm run build
+
+# 4. Optional: Add Google Maps API key to .env
+# GOOGLE_MAPS_API_KEY=your_key_here
+
+# 5. Restart server
+npm start
+```
+
+### 🎉 What's Next
+
+Potential future enhancements:
+- [ ] Image recognition for food photos
+- [ ] Video message support
+- [ ] Real-time translation for staff communication
+- [ ] Voice response generation (TTS)
+- [ ] Sentiment analysis for customer satisfaction
+- [ ] Advanced reservation availability checking
+
+---
+
 ## [2.0.0] - 2025-01-16
 
 ### 🎉 Nouvelles Fonctionnalités Majeures

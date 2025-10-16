@@ -7,7 +7,7 @@ import axios, { AxiosInstance } from 'axios';
 
 export interface WhatsAppMessage {
   to: string;
-  type: 'text' | 'document' | 'interactive';
+  type: 'text' | 'document' | 'interactive' | 'location';
   text?: {
     body: string;
   };
@@ -39,6 +39,12 @@ export interface WhatsAppMessage {
         }>;
       }>;
     };
+  };
+  location?: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
   };
 }
 
@@ -254,6 +260,43 @@ export class WhatsAppClient {
       throw new Error(`Failed to send interactive list: ${error.message}`);
     }
   }
+
+  /**
+   * Send a location message to a WhatsApp user
+   */
+  async sendLocationMessage(
+    to: string,
+    latitude: number,
+    longitude: number,
+    name?: string,
+    address?: string
+  ): Promise<WhatsAppResponse> {
+    try {
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'location',
+        location: {
+          latitude,
+          longitude,
+          ...(name && { name }),
+          ...(address && { address }),
+        },
+      };
+
+      console.log(`📤 Sending location to ${to}: ${name || 'Location'}`);
+
+      const response = await this.client.post('/messages', payload);
+
+      console.log('✅ Location sent successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error sending WhatsApp location:', error.response?.data || error.message);
+      throw new Error(`Failed to send WhatsApp location: ${error.message}`);
+    }
+  }
+
 }
 
 /**

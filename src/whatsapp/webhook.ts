@@ -6,9 +6,19 @@
 import { Request, Response } from 'express';
 import { WhatsAppClient } from './client.js';
 import { Mastra } from '@mastra/core';
-import { processUserMessage } from '../agent/mastra.js';
+import { processUserMessage, detectLanguageWithMastra } from '../agent/mastra.js';
 import { sessionManager } from '../sessionManager.js';
 import { getDatabase } from '../database/supabase.js';
+import {
+  generateText,
+  generateMenuMessage,
+  generatePrompt,
+  generateReservationConfirmation,
+  generateErrorMessage,
+  generateListLabels
+} from '../i18n/dynamicTranslation.js';
+import { processAudioMessage } from '../audio/whisper.js';
+import { generateLocationResponse, INCA_LONDON_LOCATION, type LocationData } from '../location/maps.js';
 
 /**
  * Set to track processed message IDs (prevents duplicates)
@@ -18,145 +28,60 @@ const processedMessages = new Set<string>();
 const MESSAGE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Translation dictionary for UI messages
- * Used for buttons, prompts, and system messages
- */
-
-// TODO Laisser mastra faire, ne rien garder ici
-const TRANSLATIONS: Record<string, Record<string, string>> = {
-  viewMenusPrompt: {
-    en: 'Would you like to view our menus?',
-    fr: 'Souhaitez-vous consulter nos menus ?',
-    es: '¿Le gustaría ver nuestros menús?',
-    de: 'Möchten Sie unsere Menüs ansehen?',
-    it: 'Vuoi vedere i nostri menu?',
-    pt: 'Gostaria de ver nossos cardápios?',
-  },
-  viewMenusButton: {
-    en: 'View Menus',
-    fr: 'Voir les Menus',
-    es: 'Ver Menús',
-    de: 'Menüs ansehen',
-    it: 'Visualizza Menu',
-    pt: 'Ver Cardápios',
-  },
-  chooseMenuPrompt: {
-    en: 'We offer 4 different menus. Which one would you like to view?',
-    fr: 'Nous proposons 4 menus différents. Lequel souhaitez-vous consulter ?',
-    es: 'Ofrecemos 4 menús diferentes. ¿Cuál te gustaría ver?',
-    de: 'Wir bieten 4 verschiedene Menüs an. Welches möchten Sie sehen?',
-    it: 'Offriamo 4 menu diversi. Quale vorresti vedere?',
-    pt: 'Oferecemos 4 cardápios diferentes. Qual você gostaria de ver?',
-  },
-  chooseMenuButton: {
-    en: 'Choose a menu',
-    fr: 'Choisir un menu',
-    es: 'Elegir un menú',
-    de: 'Menü wählen',
-    it: 'Scegli un menu',
-    pt: 'Escolher um cardápio',
-  },
-  menuAlacarte: {
-    en: 'À la Carte',
-    fr: 'À la Carte',
-    es: 'A la Carta',
-    de: 'À la Carte',
-    it: 'Alla Carta',
-    pt: 'À la Carte',
-  },
-  menuWagyu: {
-    en: 'Wagyu',
-    fr: 'Wagyu',
-    es: 'Wagyu',
-    de: 'Wagyu',
-    it: 'Wagyu',
-    pt: 'Wagyu',
-  },
-  menuWine: {
-    en: 'Wine',
-    fr: 'Vins',
-    es: 'Vinos',
-    de: 'Weine',
-    it: 'Vini',
-    pt: 'Vinhos',
-  },
-  menuDrinks: {
-    en: 'Drinks',
-    fr: 'Boissons',
-    es: 'Bebidas',
-    de: 'Getränke',
-    it: 'Bevande',
-    pt: 'Bebidas',
-  },
-  menuMessageAlacarte: {
-    en: 'Here is the à la carte menu',
-    fr: 'Voici le menu à la carte',
-    es: 'Aquí está el menú a la carta',
-    de: 'Hier ist das À-la-carte-Menü',
-    it: 'Ecco il menu alla carta',
-    pt: 'Aqui está o cardápio à la carte',
-  },
-  menuMessageWagyu: {
-    en: 'Here is the Wagyu menu',
-    fr: 'Voici le menu Wagyu',
-    es: 'Aquí está el menú Wagyu',
-    de: 'Hier ist das Wagyu-Menü',
-    it: 'Ecco il menu Wagyu',
-    pt: 'Aqui está o cardápio Wagyu',
-  },
-  menuMessageWine: {
-    en: 'Here is the wine menu',
-    fr: 'Voici la carte des vins',
-    es: 'Aquí está la carta de vinos',
-    de: 'Hier ist die Weinkarte',
-    it: 'Ecco la carta dei vini',
-    pt: 'Aqui está a carta de vinhos',
-  },
-  menuMessageDrinks: {
-    en: 'Here is the drinks menu',
-    fr: 'Voici le menu boissons',
-    es: 'Aquí está el menú de bebidas',
-    de: 'Hier ist die Getränkekarte',
-    it: 'Ecco il menu delle bevande',
-    pt: 'Aqui está o cardápio de bebidas',
-  },
-};
-
-/**
- * Get a translated string for a given key and language
- * Falls back to English if translation not available
+ * Detect user's language from conversation history
+ * Uses the most recent text messages to detect language, ignoring button IDs
  *
- * @param key - Translation key
- * @param language - Language code (ISO 639-1)
- * @returns Translated string
+ * @param userId - User's WhatsApp ID
+ * @param userMessage - Current user message
+ * @param mastra - Mastra instance
+ * @param conversationHistory - Recent conversation messages
+ * @returns Detected language code
  */
-function translate(key: string, language: string): string {
-  const translations = TRANSLATIONS[key];
-  if (!translations) {
-    console.warn(`⚠️ Translation key not found: ${key}`);
-    return key;
+async function detectUserLanguage(
+  userId: string,
+  userMessage: string,
+  mastra: Mastra,
+  conversationHistory?: string
+): Promise<string> {
+  try {
+    // Don't detect language from button IDs (they're in English by design)
+    const isButtonClick = userMessage.startsWith('menu_') ||
+                         userMessage.startsWith('reservation_') ||
+                         userMessage.startsWith('action_');
+
+    if (isButtonClick) {
+      // Try to extract language from conversation history
+      if (conversationHistory) {
+        // Extract the last user message from history (not a button ID)
+        const historyLines = conversationHistory.split('\n');
+        for (let i = historyLines.length - 1; i >= 0; i--) {
+          const line = historyLines[i];
+          if (line.startsWith('User: ')) {
+            const lastUserMessage = line.substring(6).trim();
+            // Check if it's not a button ID
+            if (!lastUserMessage.startsWith('menu_') &&
+                !lastUserMessage.startsWith('reservation_') &&
+                !lastUserMessage.startsWith('action_') &&
+                lastUserMessage.length > 5) {
+              console.log(`🌍 Detecting language from history: "${lastUserMessage}"`);
+              const detectedLanguage = await detectLanguageWithMastra(mastra, lastUserMessage);
+              return detectedLanguage;
+            }
+          }
+        }
+      }
+      // Fallback to English if no history found
+      console.log('🌍 Button click detected, no valid history - defaulting to English');
+      return 'en';
+    }
+
+    // For regular text messages, detect language normally
+    const detectedLanguage = await detectLanguageWithMastra(mastra, userMessage);
+    return detectedLanguage;
+  } catch (error: any) {
+    console.error('❌ Error detecting language:', error);
+    return 'en'; // Default to English
   }
-
-  return translations[language] || translations['en'] || key;
-}
-
-/**
- * Get translated menu message based on menu type
- *
- * @param menuType - Menu type identifier
- * @param language - Language code
- * @returns Translated menu message
- */
-function getMenuMessage(menuType: string, language: string): string {
-  const keyMap: Record<string, string> = {
-    'alacarte': 'menuMessageAlacarte',
-    'wagyu': 'menuMessageWagyu',
-    'wine': 'menuMessageWine',
-    'drinks': 'menuMessageDrinks'
-  };
-
-  const key = keyMap[menuType];
-  return key ? translate(key, language) : '';
 }
 
 /**
@@ -180,6 +105,20 @@ interface WhatsAppWebhookMessage {
       title: string;
       description?: string;
     };
+  };
+  audio?: {
+    id: string;
+    mime_type: string;
+  };
+  voice?: {
+    id: string;
+    mime_type: string;
+  };
+  location?: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
   };
   type: string;
 }
@@ -313,14 +252,21 @@ const MENU_CONFIGS = {
 /**
  * Send intermediate "View Menus" button
  * This is shown first before displaying the menu selection list
+ * Now uses AI to generate text in any language
  *
  * @param userId - User's WhatsApp ID
  * @param whatsappClient - WhatsApp client instance
  * @param language - User's language code
+ * @param mastra - Mastra instance for text generation
  */
-async function sendViewMenusButton(userId: string, whatsappClient: WhatsAppClient, language: string): Promise<void> {
-  const prompt = translate('viewMenusPrompt', language);
-  const buttonTitle = translate('viewMenusButton', language);
+async function sendViewMenusButton(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
+  const prompt = await generatePrompt(mastra, 'view_menus_prompt', language);
+  const buttonTitle = await generatePrompt(mastra, 'view_menus_button', language);
 
   await whatsappClient.sendInteractiveButtons(
     userId,
@@ -334,39 +280,47 @@ async function sendViewMenusButton(userId: string, whatsappClient: WhatsAppClien
 /**
  * Send interactive menu selection list
  * Shows all 4 menu options for the user to choose from
+ * Now uses AI to generate text in any language
  *
  * @param userId - User's WhatsApp ID
  * @param whatsappClient - WhatsApp client instance
  * @param language - User's language code
+ * @param mastra - Mastra instance for text generation
  */
-async function sendMenuButtons(userId: string, whatsappClient: WhatsAppClient, language: string): Promise<void> {
-  const bodyText = translate('chooseMenuPrompt', language);
-  const buttonText = translate('chooseMenuButton', language);
+async function sendMenuButtons(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
+  const bodyText = await generatePrompt(mastra, 'choose_menu_prompt', language);
+  const buttonText = await generatePrompt(mastra, 'choose_menu_button', language);
+
+  // Generate menu labels in the user's language
+  const menuLabels = await generateListLabels(
+    mastra,
+    [
+      { id: 'menu_alacarte', englishLabel: 'À la Carte' },
+      { id: 'menu_wagyu', englishLabel: 'Wagyu' },
+      { id: 'menu_wine', englishLabel: 'Wine' },
+      { id: 'menu_drinks', englishLabel: 'Drinks' }
+    ],
+    language
+  );
+
+  // Generate "Menus" title in user's language
+  const menusTitle = await generateText(mastra, 'The word "Menus" (1 word)', language);
 
   await whatsappClient.sendInteractiveList(
     userId,
     bodyText,
     buttonText,
     [{
-      title: 'Menus',
-      rows: [
-        {
-          id: 'menu_alacarte',
-          title: translate('menuAlacarte', language)
-        },
-        {
-          id: 'menu_wagyu',
-          title: translate('menuWagyu', language)
-        },
-        {
-          id: 'menu_wine',
-          title: translate('menuWine', language)
-        },
-        {
-          id: 'menu_drinks',
-          title: translate('menuDrinks', language)
-        }
-      ]
+      title: menusTitle,
+      rows: menuLabels.map(item => ({
+        id: item.id,
+        title: item.label
+      }))
     }]
   );
 
@@ -375,17 +329,20 @@ async function sendMenuButtons(userId: string, whatsappClient: WhatsAppClient, l
 
 /**
  * Handle menu button clicks and send corresponding PDFs
+ * Now uses AI to generate messages in any language
  *
  * @param userId - User's WhatsApp ID
  * @param buttonId - Button ID that was clicked
  * @param whatsappClient - WhatsApp client instance
  * @param language - User's language code
+ * @param mastra - Mastra instance for text generation
  */
 async function handleMenuButtonClick(
   userId: string,
   buttonId: string,
   whatsappClient: WhatsAppClient,
-  language: string
+  language: string,
+  mastra: Mastra
 ): Promise<void> {
   const menuConfig = MENU_CONFIGS[buttonId as keyof typeof MENU_CONFIGS];
 
@@ -401,7 +358,7 @@ async function handleMenuButtonClick(
     for (const [key, config] of Object.entries(MENU_CONFIGS)) {
       if (config.type !== 'all') {
         try {
-          const menuMessage = getMenuMessage(config.type, language);
+          const menuMessage = await generateMenuMessage(mastra, config.type, language);
           await whatsappClient.sendDocument(
             userId,
             config.url,
@@ -416,7 +373,7 @@ async function handleMenuButtonClick(
     }
   } else {
     // Send single menu
-    const menuMessage = getMenuMessage(menuConfig.type, language);
+    const menuMessage = await generateMenuMessage(mastra, menuConfig.type, language);
     await whatsappClient.sendDocument(
       userId,
       menuConfig.url,
@@ -429,12 +386,14 @@ async function handleMenuButtonClick(
 
 /**
  * Gère le flux de réservation interactif
+ * Now uses AI for language detection and text generation
  */
 async function handleReservationFlow(
   userId: string,
   userMessage: string,
   whatsappClient: WhatsAppClient,
-  language: string
+  language: string,
+  mastra: Mastra
 ): Promise<boolean> {
   const flow = sessionManager.getReservationFlow(userId);
 
@@ -447,7 +406,7 @@ async function handleReservationFlow(
 
     if (isReservationRequest) {
       sessionManager.startReservationFlow(userId);
-      await sendPartySizeButtons(userId, whatsappClient, language);
+      await sendPartySizeButtons(userId, whatsappClient, language, mastra);
       return true;
     }
     return false;
@@ -464,7 +423,7 @@ async function handleReservationFlow(
       const dateMatch = userMessage.match(/\d{4}-\d{2}-\d{2}/);
       if (dateMatch) {
         sessionManager.updateReservationFlow(userId, 'time', { date: dateMatch[0] });
-        await sendTimeButtons(userId, whatsappClient, language);
+        await sendTimeButtons(userId, whatsappClient, language, mastra);
         return true;
       }
       break;
@@ -483,76 +442,159 @@ async function handleReservationFlow(
 
 /**
  * Envoie les boutons pour le nombre de personnes
+ * Now uses AI to generate text in any language
  */
-async function sendPartySizeButtons(userId: string, whatsappClient: WhatsAppClient, language: string): Promise<void> {
-  const messages: Record<string, string> = {
-    'fr': 'Pour combien de personnes souhaitez-vous réserver ?',
-    'en': 'How many people would you like to reserve for?',
-    'es': '¿Para cuántas personas desea reservar?'
-  };
+async function sendPartySizeButtons(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
+  const bodyText = await generatePrompt(mastra, 'party_size_prompt', language);
+  const buttonText = await generatePrompt(mastra, 'party_size_button', language);
 
-  const buttonText: Record<string, string> = {
-    'fr': 'Choisir',
-    'en': 'Choose',
-    'es': 'Elegir'
-  };
+  // Generate party size labels
+  const partySizeLabels = await generateListLabels(
+    mastra,
+    [
+      { id: 'reservation_party_1', englishLabel: '1 person' },
+      { id: 'reservation_party_2', englishLabel: '2 people' },
+      { id: 'reservation_party_3', englishLabel: '3 people' },
+      { id: 'reservation_party_4', englishLabel: '4 people' },
+      { id: 'reservation_party_5', englishLabel: '5 people' },
+      { id: 'reservation_party_6', englishLabel: '6 people' },
+      { id: 'reservation_party_7', englishLabel: '7 people' },
+      { id: 'reservation_party_8', englishLabel: '8 people' },
+      { id: 'reservation_party_more', englishLabel: '9+ people' }
+    ],
+    language
+  );
+
+  const peopleTitle = await generateText(mastra, 'The word "People" or "Guests" (1 word)', language);
 
   await whatsappClient.sendInteractiveList(
     userId,
-    messages[language] || messages['en'],
-    buttonText[language] || buttonText['en'],
+    bodyText,
+    buttonText,
     [{
-      title: 'Personnes',
-      rows: [
-        { id: 'reservation_party_1', title: '1 personne' },
-        { id: 'reservation_party_2', title: '2 personnes' },
-        { id: 'reservation_party_3', title: '3 personnes' },
-        { id: 'reservation_party_4', title: '4 personnes' },
-        { id: 'reservation_party_5', title: '5 personnes' },
-        { id: 'reservation_party_6', title: '6 personnes' },
-        { id: 'reservation_party_7', title: '7 personnes' },
-        { id: 'reservation_party_8', title: '8 personnes' },
-        { id: 'reservation_party_more', title: '9+ personnes' }
-      ]
+      title: peopleTitle,
+      rows: partySizeLabels.map(item => ({
+        id: item.id,
+        title: item.label
+      }))
     }]
   );
 }
 
 /**
- * Envoie un message demandant la date
+ * Generate available dates for the next 30 days
+ * Returns dates formatted for display
  */
-async function sendDateRequest(userId: string, whatsappClient: WhatsAppClient, language: string): Promise<void> {
-  const messages: Record<string, string> = {
-    'fr': 'Pour quelle date souhaitez-vous réserver ? Veuillez entrer la date au format AAAA-MM-JJ (par exemple: 2025-10-25)',
-    'en': 'What date would you like to reserve? Please enter the date in YYYY-MM-DD format (e.g., 2025-10-25)',
-    'es': '¿Para qué fecha desea reservar? Ingrese la fecha en formato AAAA-MM-DD (por ejemplo: 2025-10-25)'
-  };
+function generateAvailableDates(): Array<{ date: string; displayDate: string }> {
+  const dates: Array<{ date: string; displayDate: string }> = [];
+  const today = new Date();
 
-  await whatsappClient.sendTextMessage(userId, messages[language] || messages['en']);
+  // Generate next 30 days
+  for (let i = 0; i < 30; i++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + i);
+
+    const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // Format display date
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const dayName = dayNames[date.getDay()];
+    const monthName = monthNames[date.getMonth()];
+    const day = date.getDate();
+
+    let displayDate = `${dayName} ${day} ${monthName}`;
+
+    // Add "Today" or "Tomorrow" for first two days
+    if (i === 0) {
+      displayDate += ' (Today)';
+    } else if (i === 1) {
+      displayDate += ' (Tomorrow)';
+    }
+
+    dates.push({ date: dateStr, displayDate });
+  }
+
+  return dates;
+}
+
+/**
+ * Send interactive date selector using WhatsApp lists
+ * Creates a multi-section list with dates grouped by weeks
+ */
+async function sendDateRequest(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
+  const bodyText = await generatePrompt(mastra, 'date_request', language);
+  // WhatsApp limit: 20 chars max for button text
+  const buttonText = await generatePrompt(mastra, 'date_picker_button', language);
+
+  // Generate available dates
+  const availableDates = generateAvailableDates();
+
+  // Split dates into weeks (7 days each) for better organization
+  const sections = [];
+  const weeksLabels = ['This Week', 'Next Week', 'Week 3', 'Week 4'];
+
+  for (let weekIndex = 0; weekIndex < 4; weekIndex++) {
+    const startIndex = weekIndex * 7;
+    const endIndex = Math.min(startIndex + 7, availableDates.length);
+    const weekDates = availableDates.slice(startIndex, endIndex);
+
+    if (weekDates.length > 0) {
+      // Translate week label
+      const weekLabel = await generateText(mastra, `The phrase "${weeksLabels[weekIndex]}" (2-3 words)`, language);
+
+      sections.push({
+        title: weekLabel,
+        rows: weekDates.map(({ date, displayDate }) => ({
+          id: `reservation_date_${date}`,
+          title: displayDate
+        }))
+      });
+    }
+  }
+
+  await whatsappClient.sendInteractiveList(
+    userId,
+    bodyText,
+    buttonText,
+    sections
+  );
+
+  console.log(`✅ Sent date selector list to ${userId} in language: ${language}`);
 }
 
 /**
  * Envoie les boutons pour l'heure
+ * Now uses AI to generate text in any language
  */
-async function sendTimeButtons(userId: string, whatsappClient: WhatsAppClient, language: string): Promise<void> {
-  const messages: Record<string, string> = {
-    'fr': 'À quelle heure souhaitez-vous arriver ?',
-    'en': 'What time would you like to arrive?',
-    'es': '¿A qué hora le gustaría llegar?'
-  };
+async function sendTimeButtons(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
+  const bodyText = await generatePrompt(mastra, 'time_prompt', language);
+  const buttonText = await generatePrompt(mastra, 'time_button', language);
 
-  const buttonText: Record<string, string> = {
-    'fr': 'Choisir l\'heure',
-    'en': 'Choose time',
-    'es': 'Elegir hora'
-  };
+  const timesTitle = await generateText(mastra, 'The word "Times" or "Schedule" (1 word)', language);
 
   await whatsappClient.sendInteractiveList(
     userId,
-    messages[language] || messages['en'],
-    buttonText[language] || buttonText['en'],
+    bodyText,
+    buttonText,
     [{
-      title: 'Horaires',
+      title: timesTitle,
       rows: [
         { id: 'reservation_time_19:00', title: '19:00' },
         { id: 'reservation_time_19:30', title: '19:30' },
@@ -568,23 +610,20 @@ async function sendTimeButtons(userId: string, whatsappClient: WhatsAppClient, l
 
 /**
  * Envoie les boutons pour la durée
+ * Now uses AI to generate text in any language
  */
-async function sendDurationButtons(userId: string, whatsappClient: WhatsAppClient, language: string): Promise<void> {
-  const messages: Record<string, string> = {
-    'fr': 'Quelle durée souhaitez-vous pour votre repas ?',
-    'en': 'How long would you like your meal to be?',
-    'es': '¿Cuánto tiempo le gustaría para su comida?'
-  };
-
-  const buttonText: Record<string, string> = {
-    'fr': 'Choisir la durée',
-    'en': 'Choose duration',
-    'es': 'Elegir duración'
-  };
+async function sendDurationButtons(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
+  const bodyText = await generatePrompt(mastra, 'duration_prompt', language);
+  const buttonText = await generatePrompt(mastra, 'duration_button', language);
 
   await whatsappClient.sendInteractiveButtons(
     userId,
-    messages[language] || messages['en'],
+    bodyText,
     [
       { id: 'reservation_duration_90', title: '1h30' },
       { id: 'reservation_duration_120', title: '2h00' },
@@ -595,8 +634,14 @@ async function sendDurationButtons(userId: string, whatsappClient: WhatsAppClien
 
 /**
  * Génère et envoie le lien de réservation final
+ * Now uses AI to generate text in any language
  */
-async function sendReservationLink(userId: string, whatsappClient: WhatsAppClient, language: string): Promise<void> {
+async function sendReservationLink(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
   const flow = sessionManager.getReservationFlow(userId);
   if (!flow || !flow.data.partySize || !flow.data.date || !flow.data.time || !flow.data.duration) {
     console.error('Incomplete reservation data');
@@ -616,13 +661,14 @@ async function sendReservationLink(userId: string, whatsappClient: WhatsAppClien
 
   const reservationUrl = `${baseUrl}?${params.toString()}`;
 
-  const messages: Record<string, string> = {
-    'fr': `Parfait ! Voici le lien pour finaliser votre réservation :\n\n${reservationUrl}\n\nRécapitulatif :\n👥 ${partySize} personne(s)\n📅 ${date}\n🕐 ${time}\n⏱️ ${duration} minutes`,
-    'en': `Perfect! Here's the link to complete your reservation:\n\n${reservationUrl}\n\nSummary:\n👥 ${partySize} person(s)\n📅 ${date}\n🕐 ${time}\n⏱️ ${duration} minutes`,
-    'es': `¡Perfecto! Aquí está el enlace para completar su reserva:\n\n${reservationUrl}\n\nResumen:\n👥 ${partySize} persona(s)\n📅 ${date}\n🕐 ${time}\n⏱️ ${duration} minutos`
-  };
+  // Generate confirmation message using AI
+  const message = await generateReservationConfirmation(
+    mastra,
+    language,
+    { partySize, date, time, duration, url: reservationUrl }
+  );
 
-  await whatsappClient.sendTextMessage(userId, messages[language] || messages['en']);
+  await whatsappClient.sendTextMessage(userId, message);
 
   // Terminer le flux
   sessionManager.updateReservationFlow(userId, 'complete', {});
@@ -630,12 +676,14 @@ async function sendReservationLink(userId: string, whatsappClient: WhatsAppClien
 
 /**
  * Gère les clics sur les boutons de réservation
+ * Now uses AI for text generation
  */
 async function handleReservationButtonClick(
   userId: string,
   buttonId: string,
   whatsappClient: WhatsAppClient,
-  language: string
+  language: string,
+  mastra: Mastra
 ): Promise<void> {
   const flow = sessionManager.getReservationFlow(userId);
   if (!flow) return;
@@ -652,7 +700,15 @@ async function handleReservationButtonClick(
     }
 
     sessionManager.updateReservationFlow(userId, 'date', { partySize });
-    await sendDateRequest(userId, whatsappClient, language);
+    await sendDateRequest(userId, whatsappClient, language, mastra);
+    return;
+  }
+
+  // Gérer la date sélectionnée depuis la liste
+  if (buttonId.startsWith('reservation_date_')) {
+    const date = buttonId.replace('reservation_date_', '');
+    sessionManager.updateReservationFlow(userId, 'time', { date });
+    await sendTimeButtons(userId, whatsappClient, language, mastra);
     return;
   }
 
@@ -660,7 +716,7 @@ async function handleReservationButtonClick(
   if (buttonId.startsWith('reservation_time_')) {
     const time = buttonId.replace('reservation_time_', '');
     sessionManager.updateReservationFlow(userId, 'duration', { time });
-    await sendDurationButtons(userId, whatsappClient, language);
+    await sendDurationButtons(userId, whatsappClient, language, mastra);
     return;
   }
 
@@ -668,7 +724,7 @@ async function handleReservationButtonClick(
   if (buttonId.startsWith('reservation_duration_')) {
     const duration = parseInt(buttonId.replace('reservation_duration_', ''));
     sessionManager.updateReservationFlow(userId, 'complete', { duration });
-    await sendReservationLink(userId, whatsappClient, language);
+    await sendReservationLink(userId, whatsappClient, language, mastra);
     return;
   }
 }
@@ -712,6 +768,98 @@ async function processIncomingMessage(
     // Handle text messages
     else if (message.type === 'text' && message.text?.body) {
       userMessage = message.text.body.trim();
+    }
+    // Handle audio messages (including voice notes)
+    else if ((message.type === 'audio' || message.type === 'voice') && (message.audio?.id || message.voice?.id)) {
+      const mediaId = message.audio?.id || message.voice?.id;
+      if (!mediaId) {
+        console.error('❌ Audio message received but no media ID found');
+        return;
+      }
+
+      console.log(`🎤 Audio/Voice message received, transcribing...`);
+
+      try {
+        const accessToken = process.env.META_WHATSAPP_TOKEN;
+        if (!accessToken) {
+          throw new Error('META_WHATSAPP_TOKEN not configured');
+        }
+
+        // Get conversation history to detect language hint for better transcription
+        const tempConversation = await database.getOrCreateConversation(userId);
+        const tempMessages = await database.getConversationHistory(tempConversation.id, 5);
+        const tempHistory = database.formatHistoryForMastra(tempMessages);
+        const languageHint = await detectUserLanguage(userId, '', mastra, tempHistory);
+
+        // Transcribe audio using Whisper
+        const transcription = await processAudioMessage(mediaId, accessToken, languageHint);
+        userMessage = transcription;
+
+        console.log(`✅ Transcription: "${transcription}"`);
+
+        // Send a quick acknowledgment to user
+        await whatsappClient.sendTextMessage(
+          userId,
+          `🎤 ${await generateText(mastra, 'Say "I heard:" followed by what you transcribed (very short)', languageHint)} "${transcription}"`
+        );
+      } catch (error: any) {
+        console.error('❌ Error transcribing audio:', error);
+        const errorLang = await detectUserLanguage(userId, '', mastra);
+        const errorMsg = await generateText(
+          mastra,
+          'Apologize that you could not process the audio message',
+          errorLang
+        );
+        await whatsappClient.sendTextMessage(userId, errorMsg);
+        return;
+      }
+    }
+    // Handle location messages
+    else if (message.type === 'location' && message.location) {
+      console.log(`📍 Location received: ${message.location.latitude}, ${message.location.longitude}`);
+
+      try {
+        // Get user's language
+        const tempConversation = await database.getOrCreateConversation(userId);
+        const tempMessages = await database.getConversationHistory(tempConversation.id, 5);
+        const tempHistory = database.formatHistoryForMastra(tempMessages);
+        const userLanguage = await detectUserLanguage(userId, '', mastra, tempHistory);
+
+        // Generate response text
+        const locationData: LocationData = {
+          latitude: message.location.latitude,
+          longitude: message.location.longitude,
+          name: message.location.name,
+          address: message.location.address
+        };
+
+        const locationResponse = await generateLocationResponse(mastra, locationData, userLanguage);
+
+        // Send text response first
+        await whatsappClient.sendTextMessage(userId, locationResponse);
+
+        // Then send the restaurant's location as a WhatsApp location message
+        await whatsappClient.sendLocationMessage(
+          userId,
+          INCA_LONDON_LOCATION.latitude,
+          INCA_LONDON_LOCATION.longitude,
+          INCA_LONDON_LOCATION.name,
+          INCA_LONDON_LOCATION.address
+        );
+
+        console.log(`✅ Sent location response and restaurant location to ${userId}`);
+        return;
+      } catch (error: any) {
+        console.error('❌ Error processing location:', error);
+        const errorLang = await detectUserLanguage(userId, '', mastra);
+        const errorMsg = await generateText(
+          mastra,
+          'Apologize that you could not process the location',
+          errorLang
+        );
+        await whatsappClient.sendTextMessage(userId, errorMsg);
+        return;
+      }
     }
     // Ignore other message types
     else {
@@ -765,36 +913,32 @@ async function processIncomingMessage(
     // === BUTTON CLICK HANDLERS ===
     // These need to be checked before passing to Mastra
 
+    // Detect user language for button interactions (pass conversation history to detect from context)
+    const detectedLanguage = await detectUserLanguage(userId, userMessage, mastra, conversationHistory);
+
     // Handle "View Menus" button click -> show menu selection
     if (userMessage === 'action_view_menus') {
-      // We need language from a previous message or detect from history
-      // For now, we'll use a default approach - the language will be detected by Mastra
-      const detectedLanguage = 'en'; // Will be improved by looking at history
-      await sendMenuButtons(userId, whatsappClient, detectedLanguage);
+      await sendMenuButtons(userId, whatsappClient, detectedLanguage, mastra);
       console.log(`✅ Processing complete for ${userId}`);
       return;
     }
 
     // Handle direct menu requests from button clicks
     if (userMessage.startsWith('menu_')) {
-      // Detect language from recent conversation history or default to English
-      const detectedLanguage = 'en'; // Will be improved by looking at history
-      await handleMenuButtonClick(userId, userMessage, whatsappClient, detectedLanguage);
+      await handleMenuButtonClick(userId, userMessage, whatsappClient, detectedLanguage, mastra);
       console.log(`✅ Processing complete for ${userId}`);
       return;
     }
 
     // Handle reservation button clicks
     if (userMessage.startsWith('reservation_')) {
-      const detectedLanguage = 'en'; // Will be improved
-      await handleReservationButtonClick(userId, userMessage, whatsappClient, detectedLanguage);
+      await handleReservationButtonClick(userId, userMessage, whatsappClient, detectedLanguage, mastra);
       console.log(`✅ Processing complete for ${userId}`);
       return;
     }
 
     // Check if user is in a reservation flow
-    const detectedLanguage = 'en'; // Will be improved
-    const handledByReservationFlow = await handleReservationFlow(userId, userMessage, whatsappClient, detectedLanguage);
+    const handledByReservationFlow = await handleReservationFlow(userId, userMessage, whatsappClient, detectedLanguage, mastra);
     if (handledByReservationFlow) {
       console.log(`✅ Processing complete for ${userId} (reservation flow)`);
       return;
@@ -816,7 +960,7 @@ async function processIncomingMessage(
     // If agent wants to send all menus at once
     if (agentResponse.sendAllMenus) {
       console.log(`📋 Sending all menus to ${userId}`);
-      await handleMenuButtonClick(userId, 'menu_all', whatsappClient, userLanguage);
+      await handleMenuButtonClick(userId, 'menu_all', whatsappClient, userLanguage, mastra);
       console.log(`✅ Processing complete for ${userId}`);
       return;
     }
@@ -824,7 +968,7 @@ async function processIncomingMessage(
     // If agent wants to show intermediate "View Menus" button
     if (agentResponse.showViewMenusButton) {
       console.log(`📋 Showing "View Menus" button to ${userId}`);
-      await sendViewMenusButton(userId, whatsappClient, userLanguage);
+      await sendViewMenusButton(userId, whatsappClient, userLanguage, mastra);
       console.log(`✅ Processing complete for ${userId}`);
       return;
     }
@@ -832,7 +976,7 @@ async function processIncomingMessage(
     // If agent wants to show menu selection buttons
     if (agentResponse.showMenuButtons) {
       console.log(`📋 Showing menu selection list to ${userId}`);
-      await sendMenuButtons(userId, whatsappClient, userLanguage);
+      await sendMenuButtons(userId, whatsappClient, userLanguage, mastra);
       console.log(`✅ Processing complete for ${userId}`);
       return;
     }
@@ -843,7 +987,7 @@ async function processIncomingMessage(
 
       for (const menu of agentResponse.menusToSend) {
         try {
-          const menuMessage = getMenuMessage(menu.type, userLanguage);
+          const menuMessage = await generateMenuMessage(mastra, menu.type, userLanguage);
 
           await whatsappClient.sendDocument(
             userId,
@@ -872,20 +1016,55 @@ async function processIncomingMessage(
       });
 
       console.log(`✅ Text response sent to ${userId}`);
+
+      // Check if the response mentions the address/location and send WhatsApp location pin
+      const addressKeywords = ['address', 'adresse', 'argyll street', 'oxford circus', 'soho', 'w1f 7tf', 'where are you', 'où êtes-vous', '8-9 argyll'];
+      const responseText = agentResponse.text.toLowerCase();
+      const mentionsAddress = addressKeywords.some(keyword => responseText.includes(keyword.toLowerCase()));
+
+      if (mentionsAddress) {
+        console.log(`📍 Response mentions address, sending location pin to ${userId}`);
+        await whatsappClient.sendLocationMessage(
+          userId,
+          INCA_LONDON_LOCATION.latitude,
+          INCA_LONDON_LOCATION.longitude,
+          INCA_LONDON_LOCATION.name,
+          INCA_LONDON_LOCATION.address
+        );
+        console.log(`✅ Location pin sent to ${userId}`);
+      }
     }
 
     console.log(`✅ Processing complete for ${userId}`);
   } catch (error: any) {
     console.error('❌ Error processing incoming message:', error);
 
-    // Try to send error message to user
+    // Try to send error message to user in their language
     try {
-      await whatsappClient.sendTextMessage(
-        message.from,
-        "I apologize, but I'm experiencing a technical issue. Please try again in a moment, or contact us directly:\n\n📞 +44 (0)20 7734 6066\n📧 reservations@incalondon.com"
-      );
+      // Try to detect language or use English as fallback
+      let errorLanguage = 'en';
+      try {
+        if (message.text?.body) {
+          errorLanguage = await detectUserLanguage(message.from, message.text.body, mastra);
+        }
+      } catch (langError) {
+        // Fallback to English if detection fails
+        console.error('Failed to detect language for error message:', langError);
+      }
+
+      const errorMessage = await generateErrorMessage(mastra, errorLanguage, 'technical');
+      await whatsappClient.sendTextMessage(message.from, errorMessage);
     } catch (sendError) {
       console.error('❌ Failed to send error message to user:', sendError);
+      // Last resort: send hardcoded English message
+      try {
+        await whatsappClient.sendTextMessage(
+          message.from,
+          "I apologize, but I'm experiencing a technical issue. Please try again in a moment, or contact us directly:\n\n📞 +44 (0)20 7734 6066\n📧 reservations@incalondon.com"
+        );
+      } catch (finalError) {
+        console.error('❌ Failed to send fallback error message:', finalError);
+      }
     }
   }
 }
