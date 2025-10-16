@@ -1,27 +1,91 @@
-# Inca London WhatsApp Bot
+# 🎭 Inca London WhatsApp Bot
 
-An intelligent WhatsApp chatbot for **Inca London**, a premium Latin American restaurant and dinner-show venue in Soho, London.
+Un chatbot WhatsApp intelligent et multilingue pour **Inca London**, un restaurant latino-américain haut de gamme avec dîner-spectacle situé à Soho, Londres.
 
-## Overview
+## 🌟 Présentation
 
-This bot provides automated customer service for Inca London via **Meta WhatsApp Business API**, powered by the **Mastra framework** and **OpenAI GPT-4** for natural language understanding.
+Ce bot fournit un service client automatisé pour Inca London via **Meta WhatsApp Business API**, propulsé par le framework **Mastra** et **OpenAI GPT-4** pour la compréhension du langage naturel.
 
-**Key Features:**
-- 🤖 AI-powered responses using Mastra framework and OpenAI GPT-4
-- 🛠️ Custom tools for restaurant-specific information
-- 📱 Meta WhatsApp Business API integration
-- 🌐 Webhook-based architecture with Express server
-- 🔧 No database or memory management required
-- 🎯 Handles inquiries about reservations, menu, events, and more
+### Fonctionnalités Clés
 
-## Prerequisites
+#### 🤖 Intelligence Artificielle Avancée
+- **Agent Mastra AI** : Réponses contextuelles et intelligentes basées sur GPT-4
+- **Détection automatique de langue** : Supporte toutes les langues via Mastra
+- **Traduction automatique** : Détecte l'intention en traduisant vers l'anglais
+- **Réponses multilingues** : Répond toujours dans la langue de l'utilisateur
+- **Comportement proactif** : Guide l'utilisateur naturellement (menus → réservation)
 
-Before you begin, ensure you have:
-- Node.js (v18 or higher)
-- npm or yarn
-- **OpenAI API key** ([Get one here](https://platform.openai.com/api-keys))
-- **Meta Developer Account** with WhatsApp Business API access
-- **ngrok** for exposing local webhook ([Download here](https://ngrok.com/download))
+#### 💾 Gestion des Conversations
+- **Base de données Supabase** : Historique persistant de toutes les conversations
+- **Contexte conversationnel** : Mastra a accès aux messages précédents
+- **Détection nouveaux/anciens utilisateurs** : Adapte le message de bienvenue
+- **Suivi des statuts** : Messages lus, délivrés, conversations ouvertes/fermées
+
+#### 📋 Menus Interactifs
+- **Bouton intermédiaire "Voir les Menus"** : Workflow en deux étapes pour une meilleure UX
+- **4 menus disponibles** : À la carte, Wagyu, Vins, Boissons
+- **Envoi de PDFs** : Documents envoyés directement dans WhatsApp
+- **Messages traduits** : "Voici le menu..." dans la langue de l'utilisateur
+
+#### 🎫 Système de Réservation
+- **Flux interactif guidé** : Nombre de personnes → Date → Heure → Durée
+- **Lien de réservation SevenRooms** : Génération automatique avec tous les paramètres
+- **Messages multilingues** : Tous les prompts traduits dans la langue de l'utilisateur
+
+## 🏗️ Architecture
+
+```
+src/
+├── agent/
+│   └── mastra.ts              # Configuration Mastra AI + détection langue + traduction
+├── database/
+│   └── supabase.ts            # Gestion base de données (conversations + messages)
+├── whatsapp/
+│   ├── client.ts              # Client API Meta WhatsApp Business
+│   └── webhook.ts             # Gestion webhooks + logique métier principale
+├── config.ts                  # Configuration restaurant (horaires, adresses, etc.)
+├── sessionManager.ts          # Gestion sessions utilisateurs (flux de réservation)
+└── index.ts                   # Point d'entrée serveur Express
+```
+
+## 📊 Schéma de Base de Données (Supabase)
+
+### Table `conversations`
+```sql
+CREATE TABLE public.conversations (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_phone text NOT NULL,
+    status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+    started_at timestamptz NOT NULL DEFAULT now(),
+    last_message_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+### Table `messages`
+```sql
+CREATE TABLE public.messages (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    conversation_id uuid NOT NULL REFERENCES conversations(id),
+    wa_message_id text,
+    direction text NOT NULL CHECK (direction IN ('in', 'out')),
+    sender text NOT NULL CHECK (sender IN ('user', 'bot')),
+    message_type text NOT NULL DEFAULT 'text',
+    text_content text,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    delivered_at timestamptz,
+    read_at timestamptz
+);
+```
+
+## 📋 Prérequis
+
+Avant de commencer, assurez-vous d'avoir :
+- **Node.js** : v18 ou supérieur
+- **npm** ou **yarn**
+- **Compte OpenAI** avec clé API ([Obtenir ici](https://platform.openai.com/api-keys))
+- **Compte Meta Developer** avec accès WhatsApp Business API
+- **Projet Supabase** configuré ([Créer gratuitement](https://supabase.com))
+- **ngrok** pour exposer le webhook en local ([Télécharger](https://ngrok.com/download))
 
 ## Installation
 
@@ -50,18 +114,55 @@ npm run build
 
 ## Configuration
 
-### Step 1: Get OpenAI API Key
+### Étape 1 : Obtenir une clé API OpenAI
 
-1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
-2. Create a new API key
-3. Add it to your `.env` file:
+1. Allez sur [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Créez une nouvelle clé API
+3. Ajoutez-la à votre fichier `.env` :
 ```env
 OPENAI_API_KEY=sk-proj-xxxxx
 ```
 
-### Step 2: Setup Meta WhatsApp Business API
+### Étape 1.5 : Configurer Supabase
 
-#### Create Meta App
+1. **Créer un projet Supabase** :
+   - Allez sur [Supabase](https://supabase.com)
+   - Créez un nouveau projet
+   - Notez l'URL du projet et la clé API
+
+2. **Créer les tables** :
+   - Option A (Recommandé) : Utilisez les migrations
+     ```bash
+     npm install -g supabase
+     supabase link --project-ref VOTRE_PROJECT_ID
+     supabase db push
+     ```
+
+   - Option B : SQL Editor
+     - Allez dans SQL Editor sur Supabase
+     - Exécutez les scripts SQL de la section "Schéma de Base de Données" ci-dessus
+
+3. **Récupérer les credentials** :
+   - Project URL : `https://xxx.supabase.co`
+   - API Key (anon) : Dans Settings > API
+   - Service Role Key : Dans Settings > API (gardez-la secrète !)
+   - Database credentials : Dans Settings > Database
+
+4. **Ajouter à `.env`** :
+```env
+SUPABASE_URL=https://xkqjvytqgdzgmxmfgbwb.supabase.co
+SUPABASE_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_PROJECT_ID=xkqjvytqgdzgmxmfgbwb
+SUPABASE_DB_PORT=5432
+SUPABASE_DB_HOST=db.xkqjvytqgdzgmxmfgbwb.supabase.co
+SUPABASE_DB_USER=postgres
+SUPABASE_DB_PASSWORD=votre_password_database
+```
+
+### Étape 2 : Configurer Meta WhatsApp Business API
+
+#### Créer une App Meta
 1. Go to [Meta for Developers](https://developers.facebook.com/apps/)
 2. Click **Create App**
 3. Choose **Business** type
@@ -102,18 +203,32 @@ NGROK_URL=https://xxxx.ngrok.io
 4. Click **Verify and Save**
 5. Subscribe to **messages** webhook field
 
-### Final .env File
+### Fichier `.env` Final
 
-Your `.env` should look like this:
+Votre `.env` devrait ressembler à ceci :
 ```env
 NODE_ENV=development
 PORT=3000
 
+# OpenAI
 OPENAI_API_KEY=sk-proj-xxxxx
+
+# Meta WhatsApp
 META_WHATSAPP_TOKEN=EAAxxxxx
 META_WHATSAPP_PHONE_NUMBER_ID=123456789
 META_WEBHOOK_VERIFY_TOKEN=your_secure_random_token
 
+# Supabase
+SUPABASE_URL=https://xkqjvytqgdzgmxmfgbwb.supabase.co
+SUPABASE_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+SUPABASE_PROJECT_ID=xkqjvytqgdzgmxmfgbwb
+SUPABASE_DB_PORT=5432
+SUPABASE_DB_HOST=db.xkqjvytqgdzgmxmfgbwb.supabase.co
+SUPABASE_DB_USER=postgres
+SUPABASE_DB_PASSWORD=votre_password
+
+# Ngrok (développement)
 NGROK_URL=https://xxxx.ngrok.io
 ```
 

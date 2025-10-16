@@ -7,7 +7,7 @@ import axios, { AxiosInstance } from 'axios';
 
 export interface WhatsAppMessage {
   to: string;
-  type: 'text' | 'document';
+  type: 'text' | 'document' | 'interactive';
   text?: {
     body: string;
   };
@@ -15,6 +15,30 @@ export interface WhatsAppMessage {
     link: string;
     caption?: string;
     filename?: string;
+  };
+  interactive?: {
+    type: 'button' | 'list';
+    body: {
+      text: string;
+    };
+    action: {
+      buttons?: Array<{
+        type: 'reply';
+        reply: {
+          id: string;
+          title: string;
+        };
+      }>;
+      button?: string;
+      sections?: Array<{
+        title: string;
+        rows: Array<{
+          id: string;
+          title: string;
+          description?: string;
+        }>;
+      }>;
+    };
   };
 }
 
@@ -127,6 +151,107 @@ export class WhatsAppClient {
       console.log(`⌨️ Typing indicator for ${to} (simulated)`);
     } catch (error) {
       // Silent fail for typing indicator
+    }
+  }
+
+  /**
+   * Send an interactive button message (max 3 buttons for WhatsApp)
+   */
+  async sendInteractiveButtons(
+    to: string,
+    bodyText: string,
+    buttons: Array<{ id: string; title: string }>
+  ): Promise<WhatsAppResponse> {
+    try {
+      // WhatsApp only allows max 3 buttons in button messages
+      if (buttons.length > 3) {
+        throw new Error('WhatsApp button messages support maximum 3 buttons. Use sendInteractiveList for more options.');
+      }
+
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: {
+            text: bodyText,
+          },
+          action: {
+            buttons: buttons.map(btn => ({
+              type: 'reply' as const,
+              reply: {
+                id: btn.id,
+                title: btn.title.substring(0, 20), // WhatsApp limit is 20 chars
+              },
+            })),
+          },
+        },
+      };
+
+      console.log(`📤 Sending interactive buttons to ${to}`);
+
+      const response = await this.client.post('/messages', payload);
+
+      console.log('✅ Interactive buttons sent successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error sending interactive buttons:', error.response?.data || error.message);
+      throw new Error(`Failed to send interactive buttons: ${error.message}`);
+    }
+  }
+
+  /**
+   * Send an interactive list message (for more than 3 options)
+   */
+  async sendInteractiveList(
+    to: string,
+    bodyText: string,
+    buttonText: string,
+    sections: Array<{
+      title: string;
+      rows: Array<{
+        id: string;
+        title: string;
+        description?: string;
+      }>;
+    }>
+  ): Promise<WhatsAppResponse> {
+    try {
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          body: {
+            text: bodyText,
+          },
+          action: {
+            button: buttonText,
+            sections: sections.map(section => ({
+              title: section.title.substring(0, 24), // WhatsApp limit
+              rows: section.rows.map(row => ({
+                id: row.id,
+                title: row.title.substring(0, 24), // WhatsApp limit
+                ...(row.description && { description: row.description.substring(0, 72) }), // WhatsApp limit
+              })),
+            })),
+          },
+        },
+      };
+
+      console.log(`📤 Sending interactive list to ${to}`);
+
+      const response = await this.client.post('/messages', payload);
+
+      console.log('✅ Interactive list sent successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error sending interactive list:', error.response?.data || error.message);
+      throw new Error(`Failed to send interactive list: ${error.message}`);
     }
   }
 }

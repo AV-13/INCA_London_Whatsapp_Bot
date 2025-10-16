@@ -22,7 +22,7 @@ const SYSTEM_INSTRUCTIONS = `Tu es un agent conversationnel WhatsApp pour Inca L
 Représenter Inca London avec élégance, énergie et professionnalisme. Assister les clients internationaux avec chaleur et précision tout en reflétant l'expérience immersive unique de ce lieu.
 
 ## Style de Communication
-- Langue : Réponds toujours dans la langue utilisée par l'utilisateur, pour toutes les langues. Si tu ne peux pas détecter la langue, réponds en anglais
+- Langue : Réponds toujours dans la langue utilisée par l'utilisateur, pour toutes les langues.
 - Ton : Élégant, festif, professionnel et accueillant
 - Style : Direct, concis et précis - pas de fioritures
 - Format : Messages ultra-courts optimisés pour WhatsApp (2-3 phrases maximum)
@@ -31,6 +31,28 @@ Représenter Inca London avec élégance, énergie et professionnalisme. Assiste
 - NE JAMAIS dire "Comment puis-je vous aider ?" sauf si on te le demande explicitement
 - Va droit au but sans longues introductions
 - Si l'utilisateur pose une question simple, donne une réponse simple
+
+## Comportement Proactif
+Tu dois être PROACTIF et guider l'utilisateur naturellement à travers son parcours :
+
+1. **Après avoir envoyé un menu** : Propose spontanément de faire une réservation
+   - Exemple : "Tentant, n'est-ce pas ? Souhaitez-vous réserver une table ?"
+   - Sois naturel et conversationnel, pas robotique
+
+2. **Après avoir répondu à une question sur le restaurant** : Suggère la prochaine étape logique
+   - Si on parle du spectacle → Proposer de voir les menus ou réserver
+   - Si on parle des horaires → Proposer de réserver
+   - Si on parle de la cuisine → Proposer de voir les menus
+
+3. **Contexte de conversation** : Utilise l'historique pour être pertinent
+   - Si l'utilisateur semble intéressé, encourage-le doucement
+   - Ne sois jamais insistant, reste élégant
+
+4. **Ordre naturel du parcours** :
+   - Salutation → Présentation du restaurant (seulement pour nouveaux utilisateurs)
+   - Question sur le restaurant → Réponse + suggestion de voir les menus
+   - Consultation des menus → Proposition de réservation
+   - Réservation → Confirmation et remerciements
 
 ## Règles de Formatage WhatsApp
 - N'UTILISE PAS le formatage markdown (**gras** ou __souligné__)
@@ -134,15 +156,11 @@ Comment puis-je vous assister ce soir ?"
 
 ### Menu & Boissons
 GESTION IMPORTANTE DU MENU :
-- Pour CHAQUE demande de menu, suis les instructions ci-dessous STRICTEMENT
-- Quand un utilisateur demande un menu, fournis UNIQUEMENT le menu spécifiquement demandé. Si il ne précise pas, le menu par défaut est le menu à la carte.
-- Ne liste pas tous les menus disponibles sauf si l'utilisateur demande spécifiquement "tous les menus"
-- Pour le menu principal ou à la carte : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_bdde0eb515e54beeba08ce662f63b801.pdf
-- Pour le menu Wagyu : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_bb9f24cd9a61499bbde31da9841bfb2e.pdf
-- Pour la carte des vins : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_20753e61bce346538f8868a1485acfd9.pdf
-- Pour le menu boissons/cocktails : utilise l'URL https://www.incalondon.com/_files/ugd/325c3c_eddf185fa8384622b45ff682b4d14f76.pdf
-- FORMAT STRICTE pour les réponses de menu : Ta réponse DOIT contenir UNIQUEMENT l'URL du PDF et RIEN d'autre. Pas de texte avant, pas de texte après, juste l'URL complète du PDF. Le système se chargera d'envoyer le PDF avec un message approprié dans la langue de l'utilisateur.
-- Exemple de réponse correcte quand on demande le menu : "https://www.incalondon.com/_files/ugd/325c3c_bdde0eb515e54beeba08ce662f63b801.pdf"
+- Quand un utilisateur demande un menu, le système affichera automatiquement des boutons interactifs pour qu'il puisse choisir parmi nos 4 menus
+- Tu n'as PAS besoin de lister les menus ou d'envoyer des URLs - le système s'en charge
+- Après que l'utilisateur ait consulté un menu (tu le verras dans l'historique), sois PROACTIF :
+  * Demande spontanément s'il souhaite réserver une table
+  * Exemple : "Notre menu vous plaît ? Souhaitez-vous réserver une table pour venir déguster ces plats ?"
 - N'oublie pas de mentionner les options végétariennes et sans gluten sur demande SEULEMENT si l'utilisateur pose une question spécifique sur les options alimentaires
 
 ### Divertissement
@@ -235,28 +253,164 @@ export function getIncaAgent(mastra: Mastra): any {
 
 export interface ProcessedMessageResult {
   text: string;
+  detectedLanguage: string;
   menusToSend?: Array<{
     type: string;
     name: string;
     url: string;
   }>;
+  showMenuButtons?: boolean; // Flag to show interactive menu buttons instead of URLs
+  showViewMenusButton?: boolean; // Flag to show intermediate "View Menus" button
+  sendAllMenus?: boolean; // Flag to send all 4 menu PDFs at once
+  askForReservation?: boolean; // Flag to proactively ask if user wants to make a reservation
+}
+
+/**
+ * Detect the language of a user message using Mastra
+ *
+ * @param mastra - Mastra instance
+ * @param message - User's message
+ * @returns ISO 639-1 language code (e.g., 'en', 'fr', 'es')
+ */
+export async function detectLanguageWithMastra(
+  mastra: Mastra,
+  message: string
+): Promise<string> {
+  try {
+    const agent = getIncaAgent(mastra);
+
+    const prompt = `Detect the language of this message and respond with ONLY the ISO 639-1 language code (2 letters: en, fr, es, de, it, pt, zh, ja, ar, etc.). Do not include any other text, explanation, or punctuation.
+
+Message: "${message}"
+
+Language code:`;
+
+    const result = await agent.generate(prompt);
+    const languageCode = (result.text || 'en').trim().toLowerCase().substring(0, 2);
+
+    console.log(`🌍 Detected language: ${languageCode} for message: "${message.substring(0, 50)}..."`);
+    return languageCode;
+  } catch (error: any) {
+    console.error('❌ Error detecting language:', error);
+    return 'en'; // Default to English on error
+  }
+}
+
+/**
+ * Translate a message to English for intent detection
+ *
+ * @param mastra - Mastra instance
+ * @param message - User's message in any language
+ * @param sourceLanguage - Source language code
+ * @returns Translated message in English
+ */
+export async function translateToEnglish(
+  mastra: Mastra,
+  message: string,
+  sourceLanguage: string
+): Promise<string> {
+  // If already in English, return as-is
+  if (sourceLanguage === 'en') {
+    return message;
+  }
+
+  try {
+    const agent = getIncaAgent(mastra);
+
+    const prompt = `Translate this message from ${sourceLanguage} to English. Respond with ONLY the translation, no explanations or additional text.
+
+Message: "${message}"
+
+Translation:`;
+
+    const result = await agent.generate(prompt);
+    const translation = (result.text || message).trim();
+
+    console.log(`🔤 Translated "${message}" to "${translation}"`);
+    return translation;
+  } catch (error: any) {
+    console.error('❌ Error translating message:', error);
+    return message; // Return original on error
+  }
 }
 
 /**
  * Process a user message through the Mastra agent
+ *
+ * @param mastra - Mastra instance
+ * @param userMessage - User's message
+ * @param userId - User's phone number
+ * @param conversationHistory - Optional conversation history for context
+ * @param isNewUser - Whether this is a new user
+ * @returns Processed message result with response and metadata
  */
 export async function processUserMessage(
   mastra: Mastra,
   userMessage: string,
-  userId: string
+  userId: string,
+  conversationHistory?: string,
+  isNewUser: boolean = false
 ): Promise<ProcessedMessageResult> {
   try {
     const agent = getIncaAgent(mastra);
 
     console.log(`🤖 Processing message from user ${userId}: "${userMessage}"`);
+    console.log(`   New user: ${isNewUser}`);
+    if (conversationHistory) {
+      console.log(`   Conversation history available: ${conversationHistory.length} chars`);
+    }
+
+    // Step 1: Detect the language of the message
+    const detectedLanguage = await detectLanguageWithMastra(mastra, userMessage);
+
+    // Step 2: Translate to English for intent detection
+    const translatedMessage = await translateToEnglish(mastra, userMessage, detectedLanguage);
+    const lowerMessage = translatedMessage.toLowerCase();
+
+    // Step 3: Detect intent from translated message
+
+    // Check for "all menus" request
+    const allMenusKeywords = ['all menus', 'all the menus', 'every menu', 'show all menus'];
+    const isAllMenusRequest = allMenusKeywords.some(keyword => lowerMessage.includes(keyword));
+
+    if (isAllMenusRequest) {
+      console.log('📋 All menus request detected - will send all PDFs');
+      return {
+        text: '',
+        detectedLanguage,
+        sendAllMenus: true
+      };
+    }
+
+    // Check for general menu request - show intermediate button first
+    const menuKeywords = ['menu', 'food', 'drink', 'wine', 'wagyu', 'see the menu', 'view menu', 'look at menu'];
+    const isMenuRequest = menuKeywords.some(keyword => lowerMessage.includes(keyword));
+
+    if (isMenuRequest) {
+      console.log('📋 Menu request detected - will show "View Menus" button');
+      return {
+        text: '',
+        detectedLanguage,
+        showViewMenusButton: true
+      };
+    }
+
+    // Step 4: Build context for the agent
+    let contextPrompt = userMessage;
+
+    if (conversationHistory) {
+      contextPrompt = `${conversationHistory}\n\nUser (current message): ${userMessage}`;
+    }
+
+    if (isNewUser) {
+      contextPrompt = `[NEW USER - First time interacting]\n\n${contextPrompt}`;
+    }
+
+    // Add language instruction
+    contextPrompt = `[User is speaking in language code: ${detectedLanguage}. You MUST respond in the same language.]\n\n${contextPrompt}`;
 
     // Generate response using the agent
-    const result = await agent.generate(userMessage, {
+    const result = await agent.generate(contextPrompt, {
       resourceId: userId, // Use userId as resourceId for context
     });
 
@@ -264,6 +418,7 @@ export async function processUserMessage(
     let responseText = result.text || 'I apologize, but I encountered an issue processing your request. Please try again or contact us directly at reservations@incalondon.com.';
 
     console.log(`✅ Agent response: ${responseText.substring(0, 100)}...`);
+
     // Check if the response contains menu URLs from Inca London website
     const menusToSend: Array<{ type: string; name: string; url: string }> = [];
     const menuUrls = [
@@ -280,25 +435,56 @@ export async function processUserMessage(
       }
     }
 
-    // Si des menus sont détectés, on vide le texte de réponse car le webhook gérera le message
+    // Si des menus sont détectés dans la réponse de l'agent, afficher les boutons au lieu des URLs
     if(menusToSend.length > 0) {
-        responseText = "";
+        console.log('📋 Menu URLs detected in agent response - will show "View Menus" button');
+        return {
+          text: '',
+          detectedLanguage,
+          showViewMenusButton: true
+        };
     }
 
-  console.log("TEXT TEXT : ", responseText, " MENUS : ", menusToSend);
+    // Supprimer le formatage markdown des réponses
+    responseText = removeMarkdownFormatting(responseText);
 
-  return {
+    console.log("📝 Final response text:", responseText.substring(0, 100) + '...');
+
+    return {
       text: responseText,
-      menusToSend: menusToSend.length > 0 ? menusToSend : undefined,
+      detectedLanguage,
     };
   } catch (error: any) {
     console.error('❌ Error processing message with Mastra agent:', error);
 
     // Return a friendly fallback message
     return {
-      text: "I apologize, but I'm experiencing a technical issue at the moment. Please contact us directly:\n\n📞 +44 (0)20 7734 6066\n📧 reservations@incalondon.com"
+      text: "I apologize, but I'm experiencing a technical issue at the moment. Please contact us directly:\n\n📞 +44 (0)20 7734 6066\n📧 reservations@incalondon.com",
+      detectedLanguage: 'en'
     };
   }
+}
+
+/**
+ * Supprime le formatage markdown des messages
+ */
+function removeMarkdownFormatting(text: string): string {
+  // Supprimer les ** pour le gras
+  text = text.replace(/\*\*(.+?)\*\*/g, '$1');
+
+  // Supprimer les __ pour le souligné
+  text = text.replace(/__(.+?)__/g, '$1');
+
+  // Supprimer les * pour l'italique
+  text = text.replace(/\*(.+?)\*/g, '$1');
+
+  // Supprimer les _ pour l'italique
+  text = text.replace(/_(.+?)_/g, '$1');
+
+  // Supprimer les ~~pour le barré
+  text = text.replace(/~~(.+?)~~/g, '$1');
+
+  return text;
 }
 /**
  * Fonction principale qui remplace messageHandler.ts

@@ -4,7 +4,11 @@
       "Bash(npm install:*)",
       "Bash(npm run build)",
       "Bash(npm uninstall:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(timeout 5 node:*)",
+      "Bash(test:*)",
+      "Bash(npx supabase:*)",
+      "Bash(del:*)"
     ],
     "deny": [],
     "ask": []

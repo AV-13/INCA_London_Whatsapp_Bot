@@ -2,7 +2,14 @@
  * Session manager for tracking user conversations
  */
 
-import { BOT_CONFIG } from './config';
+import { BOT_CONFIG } from './config.js';
+
+export interface ReservationData {
+  partySize?: number;
+  date?: string; // YYYY-MM-DD
+  time?: string; // HH:MM in 24h format
+  duration?: number; // in minutes
+}
 
 export interface UserSession {
   userId: string;
@@ -10,6 +17,11 @@ export interface UserSession {
   lastIntent?: string;
   lastMessageTime: number;
   messageCount: number;
+  reservationFlow?: {
+    active: boolean;
+    step: 'party_size' | 'date' | 'time' | 'duration' | 'complete';
+    data: ReservationData;
+  };
 }
 
 class SessionManager {
@@ -94,6 +106,55 @@ class SessionManager {
    */
   getActiveSessionCount(): number {
     return this.sessions.size;
+  }
+
+  /**
+   * Starts a reservation flow for a user
+   */
+  startReservationFlow(userId: string): void {
+    this.updateSession(userId, {
+      reservationFlow: {
+        active: true,
+        step: 'party_size',
+        data: {}
+      }
+    });
+  }
+
+  /**
+   * Updates reservation data and advances to next step
+   */
+  updateReservationFlow(userId: string, step: 'party_size' | 'date' | 'time' | 'duration' | 'complete', data: Partial<ReservationData>): void {
+    const session = this.getSession(userId);
+    if (!session.reservationFlow) {
+      this.startReservationFlow(userId);
+    }
+
+    const updatedData = { ...session.reservationFlow?.data, ...data };
+    this.updateSession(userId, {
+      reservationFlow: {
+        active: step !== 'complete',
+        step,
+        data: updatedData
+      }
+    });
+  }
+
+  /**
+   * Gets the current reservation flow data
+   */
+  getReservationFlow(userId: string): UserSession['reservationFlow'] | undefined {
+    const session = this.getSession(userId);
+    return session.reservationFlow;
+  }
+
+  /**
+   * Cancels the reservation flow
+   */
+  cancelReservationFlow(userId: string): void {
+    this.updateSession(userId, {
+      reservationFlow: undefined
+    });
   }
 }
 

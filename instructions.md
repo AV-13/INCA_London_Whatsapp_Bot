@@ -214,4 +214,3 @@ Termine les conversations importantes avec une touche élégante :
 © 2025 – Inca London WhatsApp Bot Prompt
 
 
-Donnez les différents types de menus proposés par Inca London. Pas juste envoyer le à la carte par défaut.
