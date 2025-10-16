@@ -192,6 +192,7 @@ au bout d'1 heure => envoyer un message si pas de réponses.
 🌍 Generated text for "Button text for "Choose" or "Select" (1-2 words)" in fr: "Choisir"
 🌍 Generated text for "The word "People" or "Guests" (1 word)" in fr: "Invités"
 
-
+Enlever le tiret dans les réponses, et dans les boutons des formulaires.
 Réponse à tout les demandes dans le cas d'un message assez long.
 Ne pas se mélanger dans les demandes. bien répondre au prompt de l'utilisateur.
+trop d'émojis, messages de conclusion pour une simple question => pas nécessaire : "D'ailleurs j'ai un anniversaire la semaine prochaine donc t je cherche un endroit pour un évent privée pour 50 personnes est ce que inca peu faire ça ? Nous allons commandé des bouteilles de champagne etc"

@@ -536,7 +536,7 @@ async function sendDateRequest(
 ): Promise<void> {
   const bodyText = await generatePrompt(mastra, 'date_request', language);
   // WhatsApp limit: 20 chars max for button text
-  const buttonText = await generatePrompt(mastra, 'date_picker_button', language);
+  // const buttonText = await generatePrompt(mastra, 'date_picker_button', language);
 
   // Generate available dates
   const availableDates = generateAvailableDates();
@@ -563,13 +563,18 @@ async function sendDateRequest(
       });
     }
   }
-
-  await whatsappClient.sendInteractiveList(
-    userId,
-    bodyText,
-    buttonText,
-    sections
-  );
+  //
+  // await whatsappClient.sendInteractiveList(
+  //   userId,
+  //   bodyText,
+  //   // buttonText,
+  //   sections
+  // );
+    // Send a quick acknowledgment to user
+    await whatsappClient.sendTextMessage(
+        userId,
+        `🎤 ${await generateText(mastra, "date_request")}`
+    );
 
   console.log(`✅ Sent date selector list to ${userId} in language: ${language}`);
 }
