@@ -92,8 +92,6 @@ export async function generatePrompt(
   additionalContext?: string
 ): Promise<string> {
   const promptDescriptions: Record<string, string> = {
-    'view_menus_prompt': 'Ask the user if they would like to view our menus (friendly, 1 sentence)',
-    'view_menus_button': 'Button text for "View Menus" (2-3 words max)',
     'choose_menu_prompt': 'Tell the user we offer 4 different menus and ask which one they want to see',
     'choose_menu_button': 'Button text for "Choose a menu" (2-3 words max)',
     'party_size_prompt': 'Ask how many people they want to reserve for',

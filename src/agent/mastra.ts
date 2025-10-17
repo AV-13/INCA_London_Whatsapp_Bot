@@ -111,6 +111,7 @@ Comment puis-je vous assister ce soir ?"
 - Réservation en ligne : https://www.sevenrooms.com/reservations/incalondon
 - Téléphone : +44 (0)20 7734 6066
 - Email : reservations@incalondon.com
+- Donne toujours le lien de réservation quand un utilisateur demande à réserver. Si il demande des informations plus précises tu peux lui répondre à partir des informations que tu possèdes.
 
 ### Politiques
 - Restriction d'âge : 18+ uniquement
@@ -127,6 +128,17 @@ Comment puis-je vous assister ce soir ?"
 - Contact : dimitri@incalondon.com
 - Téléphone : +44 (0)777 181 7677
 - Parfait pour les événements d'entreprise, anniversaires, lancements de produits, défilés de mode
+- Licence étendue rare : jusqu'à 5h du matin avec alcool
+- Licence divertissement jusqu'à 7h du matin
+- Disponible 7 jours/7 avec horaires flexibles
+
+### Capacités Détaillées
+- Capacité totale : 250 invités (145 assis)
+- Salle à Manger Principale : vue sur scène, espace de 5000 pieds carrés
+- Salle à Manger Privée : jusqu'à 15 invités, semi-privée avec vue sur scène
+- Luna Lounge : 3 arches élégantes, bar dédié, cabine DJ, système audio de pointe, éclairage ambiant ajustable
+
+
 
 ### Emplacement & Transport
 - Adresse : 8-9 Argyll Street, Londres W1F 7TF
@@ -140,6 +152,8 @@ Comment puis-je vous assister ce soir ?"
 - Médias & Presse : mediapress@incalondon.com
 - Site web : www.incalondon.com
 - Instagram : @IncaLondon | https://www.instagram.com/incalondon/
+- LinkedIn : https://www.linkedin.com/company/inca-restaurant
+- TikTok : @incalondon | https://www.tiktok.com/@incalondon
 
 ### Situations Spéciales
 - Objets perdus : Contacter la réception à reservations@incalondon.com
@@ -184,6 +198,9 @@ GESTION IMPORTANTE DU MENU :
 - Rediriger vers dimitri@incalondon.com
 - Mentionner les capacités et options de personnalisation
 - Souligner l'atmosphère unique du lieu
+Pour événements :
+- Canapés : https://www.incalondon.com/_files/ugd/325c3c_6ce57e56119d41d7bc2b351da5074358.pdf
+- Menu Fixe : https://www.incalondon.com/_files/ugd/325c3c_165d451e53b844149364ee5e8e6ddb4b.pdf
 
 ### Demandes Spéciales
 - Allergies : "Veuillez informer notre équipe à l'avance. Nous ferons de notre mieux pour vous accommoder."
@@ -212,6 +229,43 @@ Tu as accès à des outils personnalisés qui fournissent des informations préc
 - Les détails et exigences de réservation
 - L'emplacement et le transport
 - Les capacités pour événements privés
+### Luna Lounge & Club
+- Luna Lounge : 19h00 - 22h30 (Vendredi et Samedi)
+- Luna Club : 00h00 - 04h00 (Vendredi et Samedi)
+- Cocktails signature et petite restauration disponibles
+- Contact : luna@incalondon.com
+- Atmosphère mystique exclusive au sein d'Inca London
+
+### Cuisine
+- Cuisine ouverte avec spectacle
+- Techniques ancestrales et modernes combinées
+- Produits frais et soigneusement sourcés
+- Influence Nikkei (fusion péruvo-japonaise)
+- Concept de partage banquet pour événements
+
+### Parcours de Soirée
+1. Arrivée par l'escalier emblématique
+2. Apéritif au bar principal
+3. Dîner avec spectacle immersif (début 20h30-21h00)
+4. Interaction des artistes avec les convives
+5. Transformation en ambiance club (Luna Lounge)
+6. Photographie autorisée (sans flash)
+
+### Événements de Noël
+- Événements de Noël disponibles avec divertissement immersif
+- Parfait pour fêtes d'entreprise, célébrations privées
+- Brochure disponible sur demande
+- Contact équipe événements pour expériences sur-mesure
+
+### Partenariat Cool Earth
+- Don de 50p par personne pour protéger les forêts tropicales d'Amérique du Sud
+- Soutien aux communautés indigènes
+- Approche centrée sur les personnes
+- Ajouté automatiquement à l'addition (avec accord des clients)
+
+### Cartes Cadeaux
+- Cartes cadeaux disponibles sur : https://inca-london.glu.io/
+- Cadeau idéal pour une expérience unique
 
 Utilise ces outils lorsque tu as besoin d'informations spécifiques et à jour pour répondre précisément aux demandes des clients.
 
@@ -260,7 +314,6 @@ export interface ProcessedMessageResult {
     url: string;
   }>;
   showMenuButtons?: boolean; // Flag to show interactive menu buttons instead of URLs
-  showViewMenusButton?: boolean; // Flag to show intermediate "View Menus" button
   sendAllMenus?: boolean; // Flag to send all 4 menu PDFs at once
   askForReservation?: boolean; // Flag to proactively ask if user wants to make a reservation
 }
@@ -411,7 +464,7 @@ export async function processUserMessage(
       return {
         text: '',
         detectedLanguage,
-        showViewMenusButton: true
+        showMenuButtons: true
       };
     }
 
@@ -461,7 +514,7 @@ export async function processUserMessage(
         return {
           text: '',
           detectedLanguage,
-          showViewMenusButton: true
+          showMenuButtons: true
         };
     }
 
