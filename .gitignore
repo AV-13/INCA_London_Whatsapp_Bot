@@ -20,5 +20,9 @@ yarn-error.log*
 .wwebjs_auth/
 .wwebjs_cache/
 
+# WhatsApp Flow encryption keys (NEVER commit these!)
+/keys/
+*.pem
+
 # Logs
 *.log

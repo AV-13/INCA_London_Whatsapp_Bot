@@ -267,6 +267,7 @@ export interface ProcessedMessageResult {
 
 /**
  * Detect the language of a user message using Mastra
+ * IMPORTANT: Ignores ISO format dates and times (YYYY-MM-DD, HH:MM) to avoid false English detection
  *
  * @param mastra - Mastra instance
  * @param message - User's message
@@ -277,18 +278,37 @@ export async function detectLanguageWithMastra(
   message: string
 ): Promise<string> {
   try {
+    // Remove ISO format dates (YYYY-MM-DD) and times (HH:MM) before language detection
+    // These formats are international standards and should not influence language detection
+    let cleanedMessage = message
+      // Remove ISO dates: 2024-10-21, 2025-12-31, etc.
+      .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '')
+      // Remove times: 19:00, 20:30, etc.
+      .replace(/\b\d{1,2}:\d{2}\b/g, '')
+      // Remove extra whitespace
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // If after cleaning we have almost nothing left, return the previously detected language
+    if (cleanedMessage.length < 3) {
+      console.log(`🌍 Message contains only ISO formats, defaulting to 'en'`);
+      return 'en';
+    }
+
     const agent = getIncaAgent(mastra);
 
     const prompt = `Detect the language of this message and respond with ONLY the ISO 639-1 language code (2 letters: en, fr, es, de, it, pt, zh, ja, ar, etc.). Do not include any other text, explanation, or punctuation.
 
-Message: "${message}"
+IMPORTANT: Ignore any dates (YYYY-MM-DD) or times (HH:MM) as these are international formats. Focus on the actual words and sentences.
+
+Message: "${cleanedMessage}"
 
 Language code:`;
 
     const result = await agent.generate(prompt);
     const languageCode = (result.text || 'en').trim().toLowerCase().substring(0, 2);
 
-    console.log(`🌍 Detected language: ${languageCode} for message: "${message.substring(0, 50)}..."`);
+    console.log(`🌍 Detected language: ${languageCode} for message: "${message.substring(0, 50)}..." (cleaned: "${cleanedMessage.substring(0, 50)}...")`);
     return languageCode;
   } catch (error: any) {
     console.error('❌ Error detecting language:', error);

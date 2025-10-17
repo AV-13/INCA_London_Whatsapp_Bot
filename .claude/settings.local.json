@@ -8,7 +8,10 @@
       "Bash(timeout 5 node:*)",
       "Bash(test:*)",
       "Bash(npx supabase:*)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "WebFetch(domain:developers.facebook.com)",
+      "Bash(npm run generate-flow-keys:*)",
+      "Bash(npm run show-public-key:*)"
     ],
     "deny": [],
     "ask": []

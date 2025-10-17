@@ -8,7 +8,9 @@
     "build": "tsc",
     "start": "npm run build && node dist/index.js",
     "dev": "tsc && nodemon dist/index.js",
-    "dev:build": "tsc --watch"
+    "dev:build": "tsc --watch",
+    "generate-flow-keys": "node scripts/generate-flow-keys.cjs",
+    "show-public-key": "node scripts/show-public-key.cjs"
   },
   "keywords": [
     "whatsapp",

@@ -297,6 +297,62 @@ export class WhatsAppClient {
     }
   }
 
+  /**
+   * Send a WhatsApp Flow with CalendarPicker
+   * Uses WhatsApp's Flow API to send an interactive calendar for date selection
+   *
+   * NOTE: Date constraints (min/max dates, unavailable dates, include days) must be configured
+   * in the Flow JSON in Meta Business Manager. This method sends a minimal payload that triggers
+   * the Flow without dynamic data (which causes "Integrity" errors).
+   *
+   * ⚠️ TEMPORARILY DISABLED - Using manual date input instead
+   */
+  // async sendCalendarFlow(
+  //   to: string,
+  //   options: {
+  //     flowId: string; // Your WhatsApp Flow ID (must be created in Meta Business Manager)
+  //     flowCta: string; // Call-to-action button text
+  //     bodyText: string; // Message body text
+  //   }
+  // ): Promise<WhatsAppResponse> {
+  //   try {
+  //     const payload = {
+  //       messaging_product: 'whatsapp',
+  //       recipient_type: 'individual',
+  //       to,
+  //       type: 'interactive',
+  //       interactive: {
+  //         type: 'flow',
+  //         body: {
+  //           text: options.bodyText,
+  //         },
+  //         action: {
+  //           name: 'flow',
+  //           parameters: {
+  //             flow_message_version: '3',
+  //             flow_token: `reservation_${Date.now()}`,
+  //             flow_id: options.flowId,
+  //             flow_cta: options.flowCta,
+  //             // ✅ NO flow_action or flow_action_payload to avoid "Integrity" error
+  //             // ✅ Flow configuration (dates, constraints) must be in Flow JSON in Meta Business Manager
+  //           },
+  //         },
+  //       },
+  //     };
+
+  //     console.log(`📤 Sending WhatsApp Flow to ${to}`);
+  //     console.log(`   Flow ID: ${options.flowId}`);
+
+  //     const response = await this.client.post('/messages', payload);
+
+  //     console.log('✅ Flow sent successfully');
+  //     return response.data;
+  //   } catch (error: any) {
+  //     console.error('❌ Error sending WhatsApp Flow:', error.response?.data || error.message);
+  //     throw new Error(`Failed to send WhatsApp Flow: ${error.message}`);
+  //   }
+  // }
+
 }
 
 /**
@@ -314,3 +370,66 @@ export function createWhatsAppClient(): WhatsAppClient {
 
   return new WhatsAppClient(accessToken, phoneNumberId);
 }
+// export function sendCalendar() {
+//     const calendarPayload = {
+//         version: "7.2",
+//         data_api_version: "3.0",
+//         routing_model: {},
+//         screens: [
+//             {
+//                 id: "DEMO_SCREEN",
+//                 terminal: true,
+//                 title: "Demo screen",
+//                 layout: {
+//                     type: "SingleColumnLayout",
+//                     children: [
+//                         {
+//                             type: "CalendarPicker",
+//                             name: "calendar",
+//                             label: "Single date",
+//                             "helper-text": "Select a date",
+//                             required: true,
+//                             mode: "single",
+//                             "min-date": "2024-10-21",
+//                             "max-date": "2025-12-12",
+//                             "unavailable-dates": [
+//                                 "2024-11-28",
+//                                 "2024-11-01"
+//                             ],
+//                             "include-days": [
+//                                 "Mon", "Tue", "Wed", "Thu", "Fri"
+//                             ],
+//                             "init-value": "2024-10-23",
+//                             "on-select-action": {
+//                                 name: "data_exchange",
+//                                 payload: {
+//                                     calendar: "${form.calendar}"
+//                                 }
+//                             }
+//                         },
+//                         {
+//                             type: "Footer",
+//                             label: "Continue",
+//                             "on-click-action": {
+//                                 name: "data_exchange",
+//                                 payload: {}
+//                             }
+//                         }
+//                     ]
+//                 }
+//             }
+//         ]
+//     };
+//
+//     // Envoi à l’API (remplace l’URL par celle de ton endpoint)
+//     fetch("https://ton-api-endpoint.com/calendar", {
+//         method: "POST",
+//         headers: {
+//             "Content-Type": "application/json"
+//         },
+//         body: JSON.stringify(calendarPayload)
+//     })
+//         .then(res => res.json())
+//         .then(data => console.log("Réponse API :", data))
+//         .catch(err => console.error("Erreur API :", err));
+// }

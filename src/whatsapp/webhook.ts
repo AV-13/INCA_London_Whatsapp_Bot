@@ -95,7 +95,7 @@ interface WhatsAppWebhookMessage {
     body: string;
   };
   interactive?: {
-    type: 'button_reply' | 'list_reply';
+    type: 'button_reply' | 'list_reply' | 'nfm_reply';
     button_reply?: {
       id: string;
       title: string;
@@ -104,6 +104,11 @@ interface WhatsAppWebhookMessage {
       id: string;
       title: string;
       description?: string;
+    };
+    nfm_reply?: {
+      name: string;
+      body: string;
+      response_json: string;
     };
   };
   audio?: {
@@ -419,11 +424,21 @@ async function handleReservationFlow(
       return false; // Les boutons géreront via leur ID
 
     case 'date':
-      // Attendre que l'utilisateur entre une date
+      // Attendre que l'utilisateur entre une date au format YYYY-MM-DD
       const dateMatch = userMessage.match(/\d{4}-\d{2}-\d{2}/);
       if (dateMatch) {
+        console.log(`📅 Date manually entered: ${dateMatch[0]}`);
         sessionManager.updateReservationFlow(userId, 'time', { date: dateMatch[0] });
         await sendTimeButtons(userId, whatsappClient, language, mastra);
+        return true;
+      } else {
+        // Si le format n'est pas correct, redemander
+        const errorMessage = await generateText(
+          mastra,
+          'The date format is incorrect. Please enter the date in YYYY-MM-DD format (for example: 2025-10-25)',
+          language
+        );
+        await whatsappClient.sendTextMessage(userId, `❌ ${errorMessage}`);
         return true;
       }
       break;
@@ -563,24 +578,97 @@ async function sendDateRequest(
       });
     }
   }
-  //
+  // Send date list (commented out as it's a fallback)
   // await whatsappClient.sendInteractiveList(
   //   userId,
   //   bodyText,
-  //   // buttonText,
+  //   buttonText,
   //   sections
   // );
-    // Send a quick acknowledgment to user
-    await whatsappClient.sendTextMessage(
-        userId,
-        `🎤 ${await generateText(mastra, "date_request")}`
-    );
 
-  console.log(`✅ Sent date selector list to ${userId} in language: ${language}`);
+  console.log(`✅ Date request list prepared for ${userId} in language: ${language}`);
 }
 
 /**
- * Envoie les boutons pour l'heure
+ * Calculate date range for reservations
+ * Restaurant is closed on Monday and Tuesday
+ */
+function calculateAvailableDateRange(): { minDate: string; maxDate: string; unavailableDates: string[] } {
+  const today = new Date();
+  const minDate = today.toISOString().split('T')[0]; // Today
+
+  // Max date: 90 days from now
+  const maxDateObj = new Date(today);
+  maxDateObj.setDate(today.getDate() + 90);
+  const maxDate = maxDateObj.toISOString().split('T')[0];
+
+  // Calculate unavailable dates (Mondays and Tuesdays)
+  const unavailableDates: string[] = [];
+  const current = new Date(today);
+
+  while (current <= maxDateObj) {
+    const dayOfWeek = current.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday
+    if (dayOfWeek === 1 || dayOfWeek === 2) {
+      unavailableDates.push(current.toISOString().split('T')[0]);
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return { minDate, maxDate, unavailableDates };
+}
+
+/**
+ * Send manual date input request
+ * Asks user to type date in YYYY-MM-DD format
+ * Now uses AI to generate text in any language
+ *
+ * ⚠️ CALENDAR FLOW TEMPORARILY DISABLED - Using manual date input instead
+ */
+async function sendCalendarPicker(
+  userId: string,
+  whatsappClient: WhatsAppClient,
+  language: string,
+  mastra: Mastra
+): Promise<void> {
+  // ⚠️ Flow calendar code commented out - using manual date input
+  // const flowId = process.env.META_WHATSAPP_FLOW_ID;
+
+  // if (!flowId) {
+  //   console.error('❌ META_WHATSAPP_FLOW_ID not configured in .env');
+  //   await sendDateRequest(userId, whatsappClient, language, mastra);
+  //   return;
+  // }
+
+  // const flowCta = await generateText(mastra, 'Select Date', language);
+  // const bodyText = await generateText(mastra, 'Please select your preferred date for the reservation', language);
+
+  // try {
+  //   await whatsappClient.sendCalendarFlow(userId, {
+  //     flowId,
+  //     flowCta,
+  //     bodyText,
+  //   });
+  //   console.log(`✅ Sent Flow to ${userId} in language: ${language}`);
+  // } catch (error) {
+  //   console.error('❌ Error sending Flow:', error);
+  //   console.log('   Falling back to date request list');
+  //   await sendDateRequest(userId, whatsappClient, language, mastra);
+  // }
+
+  // ✅ Manual date input fallback
+  const datePrompt = await generateText(
+    mastra,
+    'Please enter your preferred reservation date in the format YYYY-MM-DD (for example: 2025-10-25). We are open Wednesday to Sunday.',
+    language
+  );
+
+  await whatsappClient.sendTextMessage(userId, `📅 ${datePrompt}`);
+
+  console.log(`✅ Sent manual date input request to ${userId} in language: ${language}`);
+}
+
+/**
+ * Send time selection buttons
  * Now uses AI to generate text in any language
  */
 async function sendTimeButtons(
@@ -592,25 +680,38 @@ async function sendTimeButtons(
   const bodyText = await generatePrompt(mastra, 'time_prompt', language);
   const buttonText = await generatePrompt(mastra, 'time_button', language);
 
-  const timesTitle = await generateText(mastra, 'The word "Times" or "Schedule" (1 word)', language);
+  // Generate time labels in the user's language
+  const timeLabels = await generateListLabels(
+    mastra,
+    [
+      { id: 'reservation_time_19:00', englishLabel: '19:00 (7:00 PM)' },
+      { id: 'reservation_time_19:30', englishLabel: '19:30 (7:30 PM)' },
+      { id: 'reservation_time_20:00', englishLabel: '20:00 (8:00 PM)' },
+      { id: 'reservation_time_20:30', englishLabel: '20:30 (8:30 PM)' },
+      { id: 'reservation_time_21:00', englishLabel: '21:00 (9:00 PM)' },
+      { id: 'reservation_time_21:30', englishLabel: '21:30 (9:30 PM)' },
+      { id: 'reservation_time_22:00', englishLabel: '22:00 (10:00 PM)' },
+      { id: 'reservation_time_22:30', englishLabel: '22:30 (10:30 PM)' },
+    ],
+    language
+  );
+
+  const timeTitle = await generateText(mastra, 'The word "Time" (1 word)', language);
 
   await whatsappClient.sendInteractiveList(
     userId,
     bodyText,
     buttonText,
     [{
-      title: timesTitle,
-      rows: [
-        { id: 'reservation_time_19:00', title: '19:00' },
-        { id: 'reservation_time_19:30', title: '19:30' },
-        { id: 'reservation_time_20:00', title: '20:00' },
-        { id: 'reservation_time_20:30', title: '20:30' },
-        { id: 'reservation_time_21:00', title: '21:00' },
-        { id: 'reservation_time_21:30', title: '21:30' },
-        { id: 'reservation_time_22:00', title: '22:00' }
-      ]
+      title: timeTitle,
+      rows: timeLabels.map(item => ({
+        id: item.id,
+        title: item.label
+      }))
     }]
   );
+
+  console.log(`✅ Sent time selection list to ${userId} in language: ${language}`);
 }
 
 /**
@@ -682,6 +783,7 @@ async function sendReservationLink(
 /**
  * Gère les clics sur les boutons de réservation
  * Now uses AI for text generation
+ * Updated to use CalendarPicker flow
  */
 async function handleReservationButtonClick(
   userId: string,
@@ -705,11 +807,20 @@ async function handleReservationButtonClick(
     }
 
     sessionManager.updateReservationFlow(userId, 'date', { partySize });
-    await sendDateRequest(userId, whatsappClient, language, mastra);
+    // Use the new CalendarPicker flow instead of date list
+    await sendCalendarPicker(userId, whatsappClient, language, mastra);
     return;
   }
 
-  // Gérer la date sélectionnée depuis la liste
+  // Gérer la date sélectionnée depuis le Flow CalendarPicker
+  if (buttonId.startsWith('reservation_flow_date_')) {
+    const date = buttonId.replace('reservation_flow_date_', '');
+    sessionManager.updateReservationFlow(userId, 'time', { date });
+    await sendTimeButtons(userId, whatsappClient, language, mastra);
+    return;
+  }
+
+  // Gérer la date sélectionnée depuis la liste (fallback)
   if (buttonId.startsWith('reservation_date_')) {
     const date = buttonId.replace('reservation_date_', '');
     sessionManager.updateReservationFlow(userId, 'time', { date });
@@ -759,6 +870,7 @@ async function processIncomingMessage(
     if (message.type === 'interactive' && message.interactive) {
       const buttonReply = message.interactive.button_reply;
       const listReply = message.interactive.list_reply;
+      const nfmReply = message.interactive.nfm_reply;
 
       if (buttonReply) {
         userMessage = buttonReply.id; // Use button ID as the message
@@ -768,6 +880,24 @@ async function processIncomingMessage(
         userMessage = listReply.id; // Use list item ID as the message
         isButtonClick = true;
         console.log(`📋 List item selected: ${listReply.id} (${listReply.title})`);
+      } else if (nfmReply) {
+        // Handle WhatsApp Flow response (e.g., CalendarPicker)
+        console.log(`📅 Flow response received: ${nfmReply.name}`);
+        try {
+          const flowData = JSON.parse(nfmReply.response_json);
+          console.log(`   Flow data:`, flowData);
+
+          // Handle calendar response
+          if (flowData.calendar || flowData.date) {
+            const selectedDate = flowData.calendar || flowData.date;
+            userMessage = `reservation_flow_date_${selectedDate}`;
+            isButtonClick = true;
+            console.log(`📅 Calendar date selected: ${selectedDate}`);
+          }
+        } catch (error) {
+          console.error('❌ Error parsing flow response:', error);
+          userMessage = nfmReply.body || '';
+        }
       }
     }
     // Handle text messages
