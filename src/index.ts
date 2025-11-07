@@ -58,6 +58,7 @@ let mastraInstance: ReturnType<typeof createMastraInstance>;
 try {
   whatsappClient = createWhatsAppClient();
   mastraInstance = createMastraInstance();
+  console.log("New prompt Version")
   console.log('✅ WhatsApp client and Mastra agent initialized');
 } catch (error: any) {
   console.error('❌ Failed to initialize services:', error.message);
