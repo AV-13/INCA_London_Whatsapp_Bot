@@ -12,7 +12,8 @@
       "WebFetch(domain:developers.facebook.com)",
       "Bash(npm run generate-flow-keys:*)",
       "Bash(npm run show-public-key:*)",
-      "Bash(az webapp:*)"
+      "Bash(az webapp:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
