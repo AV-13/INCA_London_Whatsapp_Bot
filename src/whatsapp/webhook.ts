@@ -370,20 +370,15 @@ async function processIncomingMessage(
           throw new Error('META_WHATSAPP_TOKEN not configured');
         }
 
-        const tempConversation = await database.getOrCreateConversation(userId);
-        const tempMessages = await database.getConversationHistory(tempConversation.id, 5);
-        const tempHistory = database.formatHistoryForMastra(tempMessages);
-        const languageHint = await detectUserLanguage(userId, '', mastra, tempHistory);
-
-        const transcription = await processAudioMessage(mediaId, accessToken, languageHint);
+        // Transcribe audio without language hint - let Whisper auto-detect the language
+        // This ensures accurate transcription in the original language (French, English, etc.)
+        const transcription = await processAudioMessage(mediaId, accessToken);
         userMessage = transcription;
 
         console.log(`✅ Transcription: "${transcription}"`);
 
-        await whatsappClient.sendTextMessage(
-          userId,
-          `🎤 ${await generateText(mastra, 'Say "I heard:" followed by what you transcribed (very short)', languageHint)} "${transcription}"`
-        );
+        // IMPORTANT: Audio message will continue to be processed as a normal text message
+        // It will go through the same flow as text messages (detection, agent processing, etc.)
       } catch (error: any) {
         console.error('❌ Error transcribing audio:', error);
         const errorLang = await detectUserLanguage(userId, '', mastra);

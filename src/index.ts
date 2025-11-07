@@ -76,13 +76,13 @@ app.get('/', (req: Request, res: Response) => {
 
 // Webhook verification endpoint (GET)
 // Meta will call this to verify your webhook
-app.get('/webhook', (req: Request, res: Response) => {
+app.get('/webhook/whatsapp', (req: Request, res: Response) => {
   verifyWebhook(req, res);
 });
 
 // Webhook event handler (POST)
 // Meta sends incoming messages and events here
-app.post('/webhook', async (req: Request, res: Response) => {
+app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
   await handleWebhook(req, res, whatsappClient, mastraInstance);
 });
 
