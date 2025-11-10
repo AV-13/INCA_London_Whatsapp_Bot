@@ -455,8 +455,8 @@ async function processIncomingMessage(
     console.log(`   Message ID: ${messageId}`);
     console.log(`   Content: "${userMessage}"`);
 
-    await whatsappClient.markAsRead(messageId);
-    await whatsappClient.sendTypingIndicator(userId);
+    // Mark as read with typing indicator enabled
+    await whatsappClient.markAsRead(messageId, true);
 
     // Database integration
     const conversation = await database.getOrCreateConversation(userId);

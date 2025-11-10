@@ -13,7 +13,12 @@
       "Bash(npm run generate-flow-keys:*)",
       "Bash(npm run show-public-key:*)",
       "Bash(az webapp:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill /PID 167968 /F)",
+      "Bash(taskkill:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

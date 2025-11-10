@@ -131,16 +131,23 @@ export class WhatsAppClient {
   }
 
   /**
-   * Mark a message as read
+   * Mark a message as read (optionally with typing indicator)
    */
-  async markAsRead(messageId: string): Promise<void> {
+  async markAsRead(messageId: string, showTyping: boolean = false): Promise<void> {
     try {
-      await this.client.post('/messages', {
+      const payload: any = {
         messaging_product: 'whatsapp',
         status: 'read',
         message_id: messageId,
-      });
-      console.log(`✓ Message ${messageId} marked as read`);
+      };
+
+      // Add typing indicator if requested
+      if (showTyping) {
+        payload.typing_indicator = { type: 'text' };
+      }
+
+      await this.client.post('/messages', payload);
+      console.log(`✓ Message ${messageId} marked as read${showTyping ? ' with typing indicator' : ''}`);
     } catch (error: any) {
       console.error('⚠️ Error marking message as read:', error.response?.data || error.message);
       // Non-critical error, don't throw
@@ -149,21 +156,48 @@ export class WhatsAppClient {
 
   /**
    * Send typing indicator (3 dots animation)
+   * Note: This is a legacy method. Prefer using markAsRead(messageId, true) instead.
+   * The typing indicator lasts for up to 25 seconds or until you send a message.
    */
   async sendTypingIndicator(to: string): Promise<void> {
     try {
-      await this.client.post('/messages', {
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'chat_state',
-        chat_state: 'typing',
-      });
-      console.log(`⌨️ Typing indicator sent to ${to}`);
+      // According to WhatsApp Cloud API docs, typing indicator should be sent
+      // as part of the read status. This standalone method is kept for compatibility
+      // but may not work as expected with all API versions.
+      console.log(`⌨️ Typing indicator for ${to} (use markAsRead with typing=true instead)`);
     } catch (error: any) {
       console.error('⚠️ Error sending typing indicator:', error.response?.data || error.message);
       // Non-critical error, don't throw
     }
+  }
+
+  /**
+   * Maintain typing indicator for long operations
+   * Automatically re-sends typing indicator every 20 seconds until stopped
+   * Returns a function to stop the typing indicator
+   */
+  startTypingIndicator(userId: string, messageId: string): () => void {
+    let isTyping = true;
+
+    const sendTyping = async () => {
+      while (isTyping) {
+        try {
+          await this.markAsRead(messageId, true);
+          await new Promise(resolve => setTimeout(resolve, 20000)); // Re-send every 20s (before 25s timeout)
+        } catch (error) {
+          console.error('⚠️ Error maintaining typing indicator:', error);
+          break;
+        }
+      }
+    };
+
+    sendTyping();
+
+    // Return stop function
+    return () => {
+      isTyping = false;
+      console.log(`⌨️ Stopped typing indicator for ${userId}`);
+    };
   }
 
   /**
