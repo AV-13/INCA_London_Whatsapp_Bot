@@ -118,7 +118,7 @@ Pour tous les autres messages :
 - Club Luna
 
 ### Réservations
-- Jusqu’à 8 convives : à la carte
+- Jusqu'à 8 convives : à la carte
 - 9+ convives : menu fixe requis
 - Durée : 2h
 - Délai de grâce : 15 min
@@ -126,6 +126,31 @@ Pour tous les autres messages :
 - Lien : https://www.sevenrooms.com/reservations/incalondon
 - Tel : +44 (0)20 7734 6066
 - Mail : reservations@incalondon.com
+
+### Menus Spéciaux
+
+#### Menu Canapés & Bowl Food
+- Pour événements où les invités se tiennent debout/sur canapés (non assis à table)
+- Canapés : £4 chacun (options froides et chaudes, desserts)
+- Bowl Food : £8 chacun
+- URL : https://www.incalondon.com/_files/ugd/325c3c_6ce57e56119d41d7bc2b351da5074358.pdf
+- Proposer ce menu quand :
+  * L'utilisateur mentionne un événement debout/cocktail
+  * L'utilisateur demande des options pour un événement sans places assises
+  * L'utilisateur demande des canapés ou bowl food
+
+#### Set Menus (Menus Fixes pour Groupes)
+- OBLIGATOIRE pour groupes de 9+ personnes
+- Warrior : £100 pp (sans agneau)
+- Totem : £120 pp (avec agneau Lumina)
+- Empire : £155 pp (avec ribeye et black cod)
+- Lily : £100 pp (menu végétarien)
+- Tous incluent : entrées, plat principal, accompagnements, desserts & fruits
+- URL : https://www.incalondon.com/_files/ugd/325c3c_165d451e53b844149364ee5e8e6ddb4b.pdf
+- Proposer ce menu quand :
+  * L'utilisateur mentionne 9 personnes ou plus
+  * L'utilisateur demande des options pour un grand groupe
+  * L'utilisateur demande le menu fixe
 
 ### Politiques
 - STRICTEMENT 18+
@@ -156,12 +181,20 @@ Pour tous les autres messages :
 - Presse → mediapress@incalondon.com
 - Réclamations → reservations@incalondon.com
 
-### Mineurs
-RÈGLE CRITIQUE : demander l’âge AVANT de refuser. Une famille de 4 enfants et 2 parents de 70 ans peuvent tous être majeurs. il ne faut pas refuser directement.
-- Si <18 : refus ferme
-- Si ≥18 : normal
-- Jamais d’exceptions
-- Suggérer alternatives familles en cas de refus
+### Politique d'Âge - RÈGLE CRITIQUE
+**STRICTEMENT 18 ANS ET PLUS (18+ signifie 18 INCLUS)**
+
+IMPORTANT :
+- 18 ans = ACCEPTÉ ✅ (18 est l'âge minimum légal)
+- 17 ans ou moins = REFUSÉ ❌
+- 19 ans et plus = ACCEPTÉ ✅
+
+Procédure :
+1. Toujours demander l'âge AVANT de refuser
+2. Une famille peut avoir tous ses membres majeurs (ex: 4 "enfants" de 20, 22, 25, 28 ans + parents de 70 ans)
+3. Si quelqu'un a EXACTEMENT 18 ans → C'EST ACCEPTÉ, accueillir normalement
+4. Si quelqu'un a 17 ans ou moins → Refus ferme, aucune exception
+5. En cas de refus, suggérer des alternatives familiales à Londres
 
 ### Cartes cadeaux
 - Lien : https://inca-london.glu.io/vouchers/monetary-gift-card
@@ -432,6 +465,8 @@ export async function processUserMessage(
       { type: 'wagyu', name: 'Wagyu Platter Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_bb9f24cd9a61499bbde31da9841bfb2e.pdf' },
       { type: 'wine', name: 'Wine Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_20753e61bce346538f8868a1485acfd9.pdf' },
       { type: 'drinks', name: 'Drinks Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_eddf185fa8384622b45ff682b4d14f76.pdf' },
+      { type: 'canapes', name: 'Canapés & Bowl Food Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_6ce57e56119d41d7bc2b351da5074358.pdf' },
+      { type: 'setmenus', name: 'Set Menus', url: 'https://www.incalondon.com/_files/ugd/325c3c_165d451e53b844149364ee5e8e6ddb4b.pdf' },
     ];
 
     // Check if any menu URLs are mentioned in the response

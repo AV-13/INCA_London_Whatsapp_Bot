@@ -223,6 +223,16 @@ const MENU_CONFIGS = {
     name: 'Drinks Menu',
     url: 'https://www.incalondon.com/_files/ugd/325c3c_eddf185fa8384622b45ff682b4d14f76.pdf'
   },
+  'menu_canapes': {
+    type: 'canapes',
+    name: 'Canapés & Bowl Food Menu',
+    url: 'https://www.incalondon.com/_files/ugd/325c3c_6ce57e56119d41d7bc2b351da5074358.pdf'
+  },
+  'menu_setmenus': {
+    type: 'setmenus',
+    name: 'Set Menus',
+    url: 'https://www.incalondon.com/_files/ugd/325c3c_165d451e53b844149364ee5e8e6ddb4b.pdf'
+  },
   'menu_all': {
     type: 'all',
     name: 'All Menus',
@@ -242,16 +252,35 @@ async function sendMenuButtons(
   const bodyText = await generatePrompt(mastra, 'choose_menu_prompt', language);
   const buttonText = await generatePrompt(mastra, 'choose_menu_button', language);
 
+  // Translate menu titles (short version)
   const menuLabels = await generateListLabels(
     mastra,
     [
       { id: 'menu_alacarte', englishLabel: 'À la Carte' },
-      { id: 'menu_wagyu', englishLabel: 'Wagyu' },
+      { id: 'menu_wagyu', englishLabel: 'Wagyu Platter' },
       { id: 'menu_wine', englishLabel: 'Wine' },
-      { id: 'menu_drinks', englishLabel: 'Drinks' }
+      { id: 'menu_drinks', englishLabel: 'Drinks' },
+      { id: 'menu_canapes', englishLabel: 'Canapés & Bowl Food' },
+      { id: 'menu_setmenus', englishLabel: 'Set Menus' }
     ],
     language
   );
+
+  // Translate menu descriptions ONLY for Canapés and Set Menus (those that need explanation)
+  const menuDescriptions = await generateListLabels(
+    mastra,
+    [
+      { id: 'menu_canapes', englishLabel: 'For standing events' },
+      { id: 'menu_setmenus', englishLabel: 'Required for 9+ guests' }
+    ],
+    language
+  );
+
+  // Create a map for easy lookup
+  const descriptionsMap: Record<string, string> = {
+    'menu_canapes': menuDescriptions[0].label,
+    'menu_setmenus': menuDescriptions[1].label
+  };
 
   const menusTitle = await generateText(mastra, 'The word "Menus" (1 word)', language);
 
@@ -261,9 +290,11 @@ async function sendMenuButtons(
     buttonText,
     [{
       title: menusTitle,
-      rows: menuLabels.map(item => ({
+      rows: menuLabels.map((item) => ({
         id: item.id,
-        title: item.label
+        title: item.label,
+        // Only add description for Canapés and Set Menus
+        ...(descriptionsMap[item.id] && { description: descriptionsMap[item.id] })
       }))
     }]
   );

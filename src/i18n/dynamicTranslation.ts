@@ -60,11 +60,14 @@ export async function generateMenuMessage(
   menuType: string,
   language: string
 ): Promise<string> {
+  // Menu names for the "Here is the X menu" message
   const menuNames: Record<string, string> = {
     'alacarte': 'à la carte menu',
     'wagyu': 'Wagyu menu',
     'wine': 'wine menu',
-    'drinks': 'drinks menu'
+    'drinks': 'drinks menu',
+    'canapes': 'Canapés & Bowl Food menu',
+    'setmenus': 'Set Menus'
   };
 
   const menuName = menuNames[menuType] || menuType;
@@ -92,7 +95,7 @@ export async function generatePrompt(
   additionalContext?: string
 ): Promise<string> {
   const promptDescriptions: Record<string, string> = {
-    'choose_menu_prompt': 'Tell the user we offer 4 different menus and ask which one they want to see',
+    'choose_menu_prompt': 'Tell the user we offer 6 different menus and ask which one they want to see',
     'choose_menu_button': 'Button text for "Choose a menu" (2-3 words max)',
     'party_size_prompt': 'Ask how many people they want to reserve for',
     'party_size_button': 'Button text for "Choose" or "Select" (1-2 words)',
