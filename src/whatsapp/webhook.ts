@@ -271,7 +271,7 @@ async function sendMenuButtons(
     mastra,
     [
       { id: 'menu_canapes', englishLabel: 'For standing events' },
-      { id: 'menu_setmenus', englishLabel: 'Required for 9+ guests' }
+      { id: 'menu_setmenus', englishLabel: '9+ guests: Warrior, Totem, Empire, Lily' }
     ],
     language
   );
