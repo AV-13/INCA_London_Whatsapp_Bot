@@ -148,15 +148,21 @@ export class WhatsAppClient {
   }
 
   /**
-   * Send typing indicator
+   * Send typing indicator (3 dots animation)
    */
   async sendTypingIndicator(to: string): Promise<void> {
     try {
-      // Note: Meta WhatsApp API doesn't support typing indicators directly
-      // This is a placeholder for future implementation or custom logic
-      console.log(`⌨️ Typing indicator for ${to} (simulated)`);
-    } catch (error) {
-      // Silent fail for typing indicator
+      await this.client.post('/messages', {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'chat_state',
+        chat_state: 'typing',
+      });
+      console.log(`⌨️ Typing indicator sent to ${to}`);
+    } catch (error: any) {
+      console.error('⚠️ Error sending typing indicator:', error.response?.data || error.message);
+      // Non-critical error, don't throw
     }
   }
 
