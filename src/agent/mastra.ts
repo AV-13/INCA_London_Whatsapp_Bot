@@ -62,17 +62,25 @@ Tu dois être PROACTIF et guider l'utilisateur naturellement :
    - Exemple : "Notre menu vous plaît ? Vous pouvez réserver en ligne via (donner TOUJOURS le lien si on redirige vers ailleurs) ou nous contacter directement (donner contact). Souhaitez-vous plus d'informations ?"
    - NE DIS JAMAIS "Souhaitez-vous que je vous aide à réserver ?" ou "Puis-je faire une réservation pour vous ?"
 
-2. Après une question sur le restaurant :
+2. Questions sur les plats/cuisine (IMPORTANT) :
+   - Si on te demande "quels plats", "quelques plats", "exemples de plats" :
+     * D'ABORD : Donne 3-4 exemples de plats signature concrets (Tacos Wagyu, Ceviche, Agneau fumé, etc.)
+     * ENSUITE : Propose de consulter les menus complets pour plus de détails
+     * Exemple : "Nos plats signature incluent les Tacos Wagyu, le Ceviche, l'Agneau fumé et la Truffe. Pour découvrir notre carte complète, je peux vous envoyer nos menus."
+   - Si on demande juste "voir le menu" ou "la carte" :
+     * Propose directement les menus sans lister les plats
+
+3. Après une question générale sur le restaurant :
    - Spectacle → proposer menus
    - Horaires → proposer réservation
-   - Cuisine → proposer de voir les menus
+   - Cuisine → donner exemples PUIS proposer menus
 
-3. Contexte :
+4. Contexte :
    - Utilise l'historique
    - Encourage doucement sans insister
    - Tu ne prends JAMAIS de réservation directe
 
-4. Ordre logique :
+5. Ordre logique :
    - Salutation → Présentation (uniquement premier contact)
    - Question → Réponse + suggestion menus
    - Consultation menus → Proposition réservation
@@ -424,25 +432,27 @@ export async function processUserMessage(
       };
     }
 
-    // Check for general menu request in multiple languages
-    const menuKeywords = [
+    // Check for EXPLICIT menu request (only when user wants to SEE the menus, not just asking about dishes)
+    const explicitMenuKeywords = [
       // English
-      'menu', 'food', 'drink', 'wine', 'wagyu', 'see the menu', 'view menu', 'look at menu',
+      'see the menu', 'view menu', 'look at menu', 'show me the menu', 'send me the menu',
+      'see menu', 'view the menu', 'can i see the menu', 'menus please',
       // French
-      'carte', 'nourriture', 'boisson', 'vin', 'voir la carte', 'voir le menu',
+      'voir la carte', 'voir le menu', 'envoie moi la carte', 'envoie moi le menu',
+      'je veux voir la carte', 'je veux voir le menu', 'cartes s\'il vous plaît',
       // Spanish
-      'menú', 'comida', 'bebida', 'vino', 'ver el menú',
+      'ver el menú', 'ver la carta', 'envíame el menú', 'quiero ver el menú',
       // Italian
-      'menù', 'cibo', 'bevanda', 'vino', 'vedere il menu',
+      'vedere il menu', 'vedere la carta', 'voglio vedere il menu',
       // German
-      'speisekarte', 'essen', 'getränk', 'wein',
+      'speisekarte sehen', 'menü sehen',
       // Portuguese
-      'cardápio', 'comida', 'bebida', 'vinho', 'ver o cardápio'
+      'ver o cardápio', 'ver o menu', 'quero ver o cardápio'
     ];
-    const isMenuRequest = menuKeywords.some(keyword => lowerMessage.includes(keyword));
+    const isExplicitMenuRequest = explicitMenuKeywords.some(keyword => lowerMessage.includes(keyword));
 
-    if (isMenuRequest) {
-      console.log('📋 Menu request detected - will show "View Menus" button');
+    if (isExplicitMenuRequest) {
+      console.log('📋 Explicit menu request detected - will show "View Menus" button');
       return {
         text: '',
         detectedLanguage,
