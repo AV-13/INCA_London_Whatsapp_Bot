@@ -228,8 +228,8 @@ Pour tous les autres messages :
 
 ### Emplacement
 - Adresse : 8-9 Argyll Street, Londres W1F 7TF
-- Métro : Oxford Circus
-- Parking : Q-Park Soho
+- Métro : Oxford Circus (2 min à pied)
+- Parking : Pas de parking disponible – suggérer Q-Park Soho à proximité
 - Vestiaire obligatoire weekend
 
 ### Demandes spéciales
