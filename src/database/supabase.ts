@@ -179,21 +179,29 @@ export class SupabaseDatabase {
 
   /**
    * Get conversation history for a user
-   * Returns recent messages from the current conversation
+   * Returns recent messages from the current conversation (last 30 minutes only)
    *
    * @param conversationId - The conversation ID
    * @param limit - Maximum number of messages to retrieve (default: 20)
+   * @param timeWindowMinutes - Time window in minutes to retrieve messages (default: 30)
    * @returns Array of messages ordered by creation time (oldest first)
    */
   async getConversationHistory(
     conversationId: string,
-    limit: number = 20
+    limit: number = 20,
+    timeWindowMinutes: number = 30
   ): Promise<Message[]> {
     try {
+      // Calculate the cutoff time (30 minutes ago by default)
+      const cutoffTime = new Date();
+      cutoffTime.setMinutes(cutoffTime.getMinutes() - timeWindowMinutes);
+      const cutoffISO = cutoffTime.toISOString();
+
       const { data, error } = await this.client
         .from('messages')
         .select('*')
         .eq('conversation_id', conversationId)
+        .gte('created_at', cutoffISO) // Only get messages created after the cutoff time
         .order('created_at', { ascending: false })
         .limit(limit);
 
@@ -203,7 +211,7 @@ export class SupabaseDatabase {
 
       // Reverse to get oldest first (chronological order)
       const messages = (data || []).reverse();
-      console.log(`📚 Retrieved ${messages.length} messages for conversation ${conversationId}`);
+      console.log(`📚 Retrieved ${messages.length} messages for conversation ${conversationId} (last ${timeWindowMinutes} minutes)`);
       return messages;
     } catch (error: any) {
       console.error('❌ Error getting conversation history:', error);
