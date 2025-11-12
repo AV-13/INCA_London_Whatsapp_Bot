@@ -502,8 +502,26 @@ async function processIncomingMessage(
       text_content: userMessage
     });
 
+    // Récupérer l'historique et filtrer les messages trop anciens
     const messages = await database.getConversationHistory(conversation.id, 10);
-    const conversationHistory = database.formatHistoryForMastra(messages);
+
+    // Filtrer les messages de plus de 2 heures pour éviter les rebonds sur d'anciennes conversations
+    const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+    const now = Date.now();
+    const recentMessages = messages.filter(msg => {
+      const messageTime = new Date(msg.created_at).getTime();
+      const timeDiff = now - messageTime;
+      return timeDiff < TWO_HOURS_MS;
+    });
+
+    // Détecter si c'est une reprise après une longue pause
+    const isNewSessionAfterBreak = messages.length > 0 && recentMessages.length === 0;
+
+    if (isNewSessionAfterBreak) {
+      console.log(`🔄 New session detected after break for user ${userId} - ignoring old history`);
+    }
+
+    const conversationHistory = database.formatHistoryForMastra(recentMessages);
 
     const detectedLanguage = await detectUserLanguage(userId, userMessage, mastra, conversationHistory);
 
@@ -527,7 +545,8 @@ async function processIncomingMessage(
       userMessage,
       userId,
       conversationHistory,
-      isNewUser
+      isNewUser,
+      isNewSessionAfterBreak
     );
 
     const userLanguage = agentResponse.detectedLanguage || 'en';
