@@ -1070,7 +1070,7 @@ Examples:
 Response:`;
 
         const result = await agent.generate(prompt);
-        let response = (result.text || 'none').trim().toLowerCase();
+        let response: string = (result.text || 'none').trim().toLowerCase();
 
         console.log(`📸 Photo detection raw response for "${message}": ${response}`);
 
@@ -1087,7 +1087,7 @@ Response:`;
             .replace(/\bdancers?\b/g, 'show')
             .replace(/\btables?\b/g, 'table');
 
-        const parts = response
+        const parts: string[] = response
             .split(',')
             .map(p => p.trim())
             .filter(Boolean);
