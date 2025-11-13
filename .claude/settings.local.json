@@ -18,7 +18,14 @@
       "Bash(findstr:*)",
       "Bash(taskkill /PID 167968 /F)",
       "Bash(taskkill:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(nul)",
+      "Bash(dir nul 2)",
+      "Bash(NUL)",
+      "Bash(cat:*)",
+      "Bash(mv:*)",
+      "Bash(git rm:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

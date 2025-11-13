@@ -28,6 +28,27 @@ import { generateLocationResponse, INCA_LONDON_LOCATION, type LocationData } fro
 const processedMessages = new Set<string>();
 const MESSAGE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
+// Base publique pour les assets (peut être surchargée par la variable d'environnement BASE_URL)
+const PHOTO_BASE_URL =
+    (process.env.BASE_URL ? process.env.BASE_URL.replace(/\/+$/, '') : 'https://inca-london-wa-bot-av-dvhtghakgxaaetds.francecentral-01.azurewebsites.net');
+
+// Chemin racine des photos statiques
+const PHOTO_ASSET_PATH = '/assets/photos';
+
+// Mapping des photos disponibles
+export const PHOTO_URLS = {
+    luna_lounge: `${PHOTO_BASE_URL}${PHOTO_ASSET_PATH}/inca_luna_lounge.jpg`,
+    main_room: `${PHOTO_BASE_URL}${PHOTO_ASSET_PATH}/inca_main_room.jpg`,
+    show: `${PHOTO_BASE_URL}${PHOTO_ASSET_PATH}/inca_show.jpg`,
+    show_two: `${PHOTO_BASE_URL}${PHOTO_ASSET_PATH}/inca_show_two.jpg`,
+    table: `${PHOTO_BASE_URL}${PHOTO_ASSET_PATH}/inca_table.jpg`,
+    table_two: `${PHOTO_BASE_URL}${PHOTO_ASSET_PATH}/inca_table_two.jpg`,
+} as const;
+
+// (Optionnel) Type utilitaire si besoin ailleurs
+export type PhotoKey = keyof typeof PHOTO_URLS;
+
+
 /**
  * Detect user's language from conversation history
  * Uses the most recent text messages to detect language, ignoring button IDs
@@ -618,6 +639,67 @@ async function processIncomingMessage(
         console.log(`✅ Location pin sent to ${userId}`);
       }
     }
+      // Send photos if user explicitly requested them
+      if (agentResponse.sendPhotos) {
+          console.log(`📸 User requested photos, determining which photos to send...`);
+          const photosToSend = agentResponse.sendPhotos;
+
+          try {
+              // Generate captions in user's language
+              const lunaCaption = await generateText(
+                  mastra,
+                  'Photo caption for Luna Lounge area (max 10 words)',
+                  userLanguage,
+                  'Short photo caption for lounge'
+              );
+
+              const mainRoomCaption = await generateText(
+                  mastra,
+                  'Photo caption for main dining room (max 10 words)',
+                  userLanguage,
+                  'Short photo caption for main room'
+              );
+
+              const showCaption = await generateText(
+                  mastra,
+                  'Photo caption for show/performance area (max 10 words)',
+                  userLanguage,
+                  'Short photo caption for show area'
+              );
+
+              const tableCaption = await generateText(
+                  mastra,
+                  'Photo caption for elegant table setting (max 10 words)',
+                  userLanguage,
+                  'Short photo caption for table'
+              );
+
+              // Send photos based on request
+              if (photosToSend.luna_lounge) {
+                  await whatsappClient.sendImage(userId, PHOTO_URLS.luna_lounge, `${lunaCaption} 🌙`);
+                  console.log(`✅ Luna Lounge photo sent to ${userId}`);
+              }
+
+              if (photosToSend.main_room) {
+                  await whatsappClient.sendImage(userId, PHOTO_URLS.main_room, `${mainRoomCaption} 🍽️`);
+                  console.log(`✅ Main room photo sent to ${userId}`);
+              }
+
+              if (photosToSend.show) {
+                  await whatsappClient.sendImage(userId, PHOTO_URLS.show, `${showCaption} 🎭`);
+                  console.log(`✅ Show photo sent to ${userId}`);
+              }
+
+              if (photosToSend.table) {
+                  await whatsappClient.sendImage(userId, PHOTO_URLS.table, `${tableCaption} ✨`);
+                  console.log(`✅ Table photo sent to ${userId}`);
+              }
+
+              console.log(`📸 Photo sending complete for ${userId}`);
+          } catch (photoError: any) {
+              console.error('❌ Error sending photos:', photoError);
+          }
+      }
 
     console.log(`✅ Processing complete for ${userId}`);
   } catch (error: any) {

@@ -254,8 +254,7 @@ Toujours dans un style humain, fluide, et logique.
 
 ### Menu, plats, allergènes
 
-> "Our specialties include Wagyu Tacos, Seabass Ceviche, and Tea-Smoked Lamb Chops 😋
-> The full menu is available here: [See menu]"
+> "Our specialties include Wagyu Tacos, Seabass Ceviche, and Tea-Smoked Lamb Chops 😋 Would you like to see our full menu? SHOW_MENU_BUTTONS"
 
 Si le client évoque une allergie :
 
@@ -786,10 +785,17 @@ export interface ProcessedMessageResult {
     name: string;
     url: string;
   }>;
+  sendPhotos?: IncaPhotoSelection;
   showMenuButtons?: boolean; // Flag to show interactive menu buttons instead of URLs
   sendAllMenus?: boolean; // Flag to send all 4 menu PDFs at once
   askForReservation?: boolean; // Flag to proactively ask if user wants to make a reservation
 }
+export type IncaPhotoSelection = {
+    luna_lounge?: boolean;
+    main_room?: boolean;
+    show?: boolean;
+    table?: boolean;
+};
 
 /**
  * Detect the language of a user message using Mastra
@@ -912,66 +918,7 @@ export async function processUserMessage(
     // Step 1: Detect the language of the message
     const detectedLanguage = await detectLanguageWithMastra(mastra, userMessage);
 
-    // Step 2: For intent detection only, check in multiple languages (no translation needed)
-    const lowerMessage = userMessage.toLowerCase();
-
-    // Step 3: Detect intent from message (multilingual keywords)
-
-    // Check for "all menus" request in multiple languages
-    const allMenusKeywords = [
-      // English
-      'all menus', 'all the menus', 'every menu', 'show all menus',
-      // French
-      'tous les menus', 'tous les cartes', 'voir tous les menus',
-      // Spanish
-      'todos los menús', 'todos los menus', 'ver todos los menús',
-      // Italian
-      'tutti i menu', 'tutti i menù', 'vedere tutti i menu',
-      // German
-      'alle menüs', 'alle speisekarten',
-      // Portuguese
-      'todos os cardápios', 'todos os menus'
-    ];
-    const isAllMenusRequest = allMenusKeywords.some(keyword => lowerMessage.includes(keyword));
-
-    if (isAllMenusRequest) {
-      console.log('📋 All menus request detected - will send all PDFs');
-      return {
-        text: '',
-        detectedLanguage,
-        sendAllMenus: true
-      };
-    }
-
-    // Check for EXPLICIT menu request (only when user wants to SEE the menus, not just asking about dishes)
-    const explicitMenuKeywords = [
-      // English
-      'see the menu', 'view menu', 'look at menu', 'show me the menu', 'send me the menu',
-      'see menu', 'view the menu', 'can i see the menu', 'menus please',
-      // French
-      'voir la carte', 'voir le menu', 'envoie moi la carte', 'envoie moi le menu',
-      'je veux voir la carte', 'je veux voir le menu', 'cartes s\'il vous plaît',
-      // Spanish
-      'ver el menú', 'ver la carta', 'envíame el menú', 'quiero ver el menú',
-      // Italian
-      'vedere il menu', 'vedere la carta', 'voglio vedere il menu',
-      // German
-      'speisekarte sehen', 'menü sehen',
-      // Portuguese
-      'ver o cardápio', 'ver o menu', 'quero ver o cardápio'
-    ];
-    const isExplicitMenuRequest = explicitMenuKeywords.some(keyword => lowerMessage.includes(keyword));
-
-    if (isExplicitMenuRequest) {
-      console.log('📋 Explicit menu request detected - will show "View Menus" button');
-      return {
-        text: '',
-        detectedLanguage,
-        showMenuButtons: true
-      };
-    }
-
-    // Step 4: Build context for the agent
+    // Step 2: Build context for the agent (let AI decide what to do, no keyword detection)
     let contextPrompt = userMessage;
 
     if (conversationHistory && !isNewSessionAfterBreak) {
@@ -1001,41 +948,50 @@ export async function processUserMessage(
 
     console.log(`✅ Agent response: ${responseText.substring(0, 100)}...`);
 
-    // Check if the response contains menu URLs from Inca London website
-    const menusToSend: Array<{ type: string; name: string; url: string }> = [];
-    const menuUrls = [
-      { type: 'alacarte', name: 'À la carte Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_bdde0eb515e54beeba08ce662f63b801.pdf' },
-      { type: 'wagyu', name: 'Wagyu Platter Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_bb9f24cd9a61499bbde31da9841bfb2e.pdf' },
-      { type: 'wine', name: 'Wine Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_20753e61bce346538f8868a1485acfd9.pdf' },
-      { type: 'drinks', name: 'Drinks Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_eddf185fa8384622b45ff682b4d14f76.pdf' },
-      { type: 'canapes', name: 'Canapés & Bowl Food Menu', url: 'https://www.incalondon.com/_files/ugd/325c3c_6ce57e56119d41d7bc2b351da5074358.pdf' },
-      { type: 'setmenus', name: 'Set Menus', url: 'https://www.incalondon.com/_files/ugd/325c3c_165d451e53b844149364ee5e8e6ddb4b.pdf' },
-    ];
+    // Check if the agent wants to show menu buttons (special command from AI)
+    const shouldShowMenuButtons = responseText.includes('SHOW_MENU_BUTTONS');
 
-    // Check if any menu URLs are mentioned in the response
-    for (const menu of menuUrls) {
-      if (responseText.includes(menu.url)) {
-        menusToSend.push(menu);
-      }
+    if (shouldShowMenuButtons) {
+      console.log('📋 Agent requested menu buttons - will show "View Menus" button');
+      // Remove the command from the response text
+      responseText = responseText.replace('SHOW_MENU_BUTTONS', '').trim();
+
+      // Supprimer le formatage markdown
+      responseText = removeMarkdownFormatting(responseText);
+
+      return {
+        text: responseText,
+        detectedLanguage,
+        showMenuButtons: true
+      };
     }
 
-    // Si des menus sont détectés dans la réponse de l'agent, afficher les boutons au lieu des URLs
-    if(menusToSend.length > 0) {
-        console.log('📋 Menu URLs detected in agent response - will show "View Menus" button');
-        return {
-          text: '',
-          detectedLanguage,
-          showMenuButtons: true
-        };
+    // Check if the agent wants to send all menus (special command from AI)
+    const shouldSendAllMenus = responseText.includes('SEND_ALL_MENUS');
+
+    if (shouldSendAllMenus) {
+      console.log('📋 Agent requested all menus - will send all PDFs');
+      // Remove the command from the response text
+      responseText = responseText.replace('SEND_ALL_MENUS', '').trim();
+
+      // Supprimer le formatage markdown
+      responseText = removeMarkdownFormatting(responseText);
+
+      return {
+        text: responseText,
+        detectedLanguage,
+        sendAllMenus: true
+      };
     }
 
     // Supprimer le formatage markdown des réponses
     responseText = removeMarkdownFormatting(responseText);
 
     console.log("📝 Final response text:", responseText.substring(0, 100) + '...');
-
+    const photoSelection = await detectPhotoRequest(mastra, userMessage);
     return {
       text: responseText,
+      sendPhotos: photoSelection,
       detectedLanguage,
     };
   } catch (error: any) {
@@ -1070,6 +1026,92 @@ function removeMarkdownFormatting(text: string): string {
 
   return text;
 }
+// Ajoutez ceci dans `src/whatsapp/webhook.ts` (ou un utilitaire partagé)
+
+/**
+ * Détecte si l'utilisateur veut des photos et lesquelles (INCA)
+ * @param mastra Instance Mastra
+ * @param message Message utilisateur déjà traduit en anglais
+ * @returns Objet de sélection ou undefined si aucune demande
+ */
+export async function detectPhotoRequest(
+    mastra: Mastra,
+    message: string
+): Promise<{ luna_lounge?: boolean; main_room?: boolean; show?: boolean; table?: boolean } | undefined> {
+    try {
+        const agent = getIncaAgent(mastra);
+
+        const prompt = `Analyze the user message and decide which PHOTOS of the INCA London venue to show.
+User message: "${message}"
+
+Available photo categories (canonical keys):
+- luna_lounge: lounge / bar / cocktails area
+- main_room: main dining room / general restaurant interior / ambiance
+- show: show / performance / dancers / entertainment / stage
+- table: table setting / elegant table / dinner table decor
+
+Return ONLY ONE of:
+1. "none" -> no photos requested
+2. One or multiple canonical keys separated by commas (e.g. "luna_lounge", "main_room", "show", "table")
+3. "all" -> user wants everything
+You may also use helper tokens that will be mapped:
+- "restaurant" -> main_room,luna_lounge
+- "performance" or "entertainment" -> show
+- "tables" -> table
+
+Examples:
+"show me your restaurant" -> main_room,luna_lounge
+"photos of the show" -> show
+"can I see the lounge" -> luna_lounge
+"table pictures" -> table
+"I want to see everything" -> all
+"what are your opening hours" -> none
+
+Response:`;
+
+        const result = await agent.generate(prompt);
+        let response = (result.text || 'none').trim().toLowerCase();
+
+        console.log(`📸 Photo detection raw response for "${message}": ${response}`);
+
+        if (response === 'none') {
+            return undefined;
+        }
+
+        // Normalisation des tokens spéciaux
+        response = response
+            .replace(/\ball\b/g, 'luna_lounge,main_room,show,table')
+            .replace(/\brestaurant\b/g, 'main_room,luna_lounge')
+            .replace(/\bperformance\b/g, 'show')
+            .replace(/\bentertainment\b/g, 'show')
+            .replace(/\bdancers?\b/g, 'show')
+            .replace(/\btables?\b/g, 'table');
+
+        const parts = response
+            .split(',')
+            .map(p => p.trim())
+            .filter(Boolean);
+
+        const selection = {
+            luna_lounge: parts.includes('luna_lounge'),
+            main_room: parts.includes('main_room'),
+            show: parts.includes('show'),
+            table: parts.includes('table')
+        };
+
+        // Si rien de valide
+        if (!selection.luna_lounge && !selection.main_room && !selection.show && !selection.table) {
+            return undefined;
+        }
+
+        console.log(`📸 Photo selection parsed: ${JSON.stringify(selection)}`);
+        return selection;
+    } catch (error: any) {
+        console.error('❌ Error detecting photo request (INCA):', error);
+        return undefined;
+    }
+}
+
 /**
  * Fonction principale qui remplace messageHandler.ts
  * Traite directement les messages des utilisateurs via Mastra

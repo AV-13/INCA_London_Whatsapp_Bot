@@ -7,7 +7,7 @@ import axios, { AxiosInstance } from 'axios';
 
 export interface WhatsAppMessage {
   to: string;
-  type: 'text' | 'document' | 'interactive' | 'location';
+  type: 'text' | 'document' | 'interactive' | 'location' | 'image';
   text?: {
     body: string;
   };
@@ -15,6 +15,10 @@ export interface WhatsAppMessage {
     link: string;
     caption?: string;
     filename?: string;
+  };
+  image?: {
+    link: string;
+    caption?: string;
   };
   interactive?: {
     type: 'button' | 'list';
@@ -127,6 +131,38 @@ export class WhatsAppClient {
     } catch (error: any) {
       console.error('❌ Error sending WhatsApp document:', error.response?.data || error.message);
       throw new Error(`Failed to send WhatsApp document: ${error.message}`);
+    }
+  }
+
+  /**
+   * Send an image to a WhatsApp user
+   */
+  async sendImage(
+    to: string,
+    imageUrl: string,
+    caption?: string
+  ): Promise<WhatsAppResponse> {
+    try {
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'image',
+        image: {
+          link: imageUrl,
+          ...(caption && { caption }),
+        },
+      };
+
+      console.log(`📤 Sending image to ${to}${caption ? ` with caption: ${caption.substring(0, 30)}...` : ''}`);
+
+      const response = await this.client.post('/messages', payload);
+
+      console.log('✅ Image sent successfully');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Error sending WhatsApp image:', error.response?.data || error.message);
+      throw new Error(`Failed to send WhatsApp image: ${error.message}`);
     }
   }
 

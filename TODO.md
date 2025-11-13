@@ -217,3 +217,7 @@ Exemple de flow idéal :
 Important : Actuellement, les réponses comme les dates YYYY-MM-DD ou les heures trompent mastra dans la détection de langue car il croit que c'est de l'anglais. Il faut que mastra ignore ces formats standards internationaux et se concentre sur le reste du message pour détecter la langue.
 
 Oublier l'idée du formulaire
+
+
+
+Rajouter images, liens réseaux.
