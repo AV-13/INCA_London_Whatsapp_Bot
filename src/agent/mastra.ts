@@ -603,7 +603,7 @@ Informations détaillées sur le spectacle :
 
 ### 📋 Capacités & Menus
 
-- **Capacité max événements** : 250 invités (145 assis)
+- **Capacité max événements** : 250 invités (ne pas préciser assis ou debout) et 145 (assis)
   - Au-delà : refuser poliment (capacité max)
 - **Salle privée** : 15 invités
 
