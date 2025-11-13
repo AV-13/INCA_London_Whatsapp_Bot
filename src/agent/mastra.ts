@@ -675,24 +675,31 @@ Informations détaillées sur le spectacle :
 
 ---
 
-## 📸 Photos des plats — RÈGLE CRITIQUE
+## 📸 Photos du restaurant — RÈGLE CRITIQUE
 
-### Tu NE PEUX PAS envoyer de photos
+### Tu PEUX envoyer des photos du restaurant
 
-**Si on demande des photos** :
+**Si on demande des photos du restaurant, de l'ambiance, de la décoration, des espaces** :
 
-1. Refuser poliment (pas d'accès images)
-2. Proposer descriptions détaillées
-3. Se baser **uniquement** sur les menus fournis
+1. Répondre naturellement que tu peux envoyer des photos
+2. Le système enverra automatiquement les photos appropriées basées sur la demande
+
+**Photos disponibles** :
+- Luna Lounge (bar, lounge area, cocktails)
+- Main Room (salle principale, restaurant, ambiance)
+- Show (spectacle, performances, danseurs, entertainment)
+- Table (tables élégantes, décoration)
 
 **Exemple** :
 
-> "I don't have photos, but I can describe the dishes in detail! Our Wagyu Tacos use premium wagyu; the Seabass Ceviche is citrus-cured with Peruvian notes. Want the full menu?"
+> "Of course! Let me show you our beautiful venue 📸"
 
 **RÈGLES ABSOLUES :**
-- ❌ Ne JAMAIS écrire "[photo]", "[insert photo]", "here's the photo", ou toute mention d'envoi de photo
-- ✅ Proposer une description appétissante et détaillée basée sur les menus existants
-- ✅ Ne pas inventer de détails
+- ✅ Tu PEUX mentionner que tu vas envoyer des photos du restaurant si demandé
+- ✅ Reste naturel dans ta réponse
+- ❌ Ne JAMAIS écrire "[photo]", "[insert photo]" ou utiliser du markdown pour les images
+- ❌ N'invente JAMAIS de photos de plats - tu n'as que des photos du restaurant/ambiance
+- ✅ Si on demande des photos de PLATS spécifiquement, propose plutôt le menu PDF
 
 ---
 
@@ -1031,7 +1038,7 @@ function removeMarkdownFormatting(text: string): string {
 /**
  * Détecte si l'utilisateur veut des photos et lesquelles (INCA)
  * @param mastra Instance Mastra
- * @param message Message utilisateur déjà traduit en anglais
+ * @param message Message utilisateur (peut être dans n'importe quelle langue)
  * @returns Objet de sélection ou undefined si aucune demande
  */
 export async function detectPhotoRequest(
@@ -1041,40 +1048,46 @@ export async function detectPhotoRequest(
     try {
         const agent = getIncaAgent(mastra);
 
-        const prompt = `Analyze the user message and decide which PHOTOS of the INCA London venue to show.
+        const prompt = `Analyze the user message in ANY LANGUAGE and decide which PHOTOS of the INCA London venue they want to see.
+
 User message: "${message}"
 
-Available photo categories (canonical keys):
-- luna_lounge: lounge / bar / cocktails area
-- main_room: main dining room / general restaurant interior / ambiance
-- show: show / performance / dancers / entertainment / stage
-- table: table setting / elegant table / dinner table decor
+Available photo categories:
+- luna_lounge: lounge / bar / cocktails area / luna club
+- main_room: main dining room / restaurant interior / general ambiance / salle principale
+- show: show / performance / dancers / entertainment / stage / spectacle / danseurs
+- table: table setting / elegant table / dinner table decor / table décorée
 
-Return ONLY ONE of:
-1. "none" -> no photos requested
-2. One or multiple canonical keys separated by commas (e.g. "luna_lounge", "main_room", "show", "table")
-3. "all" -> user wants everything
-You may also use helper tokens that will be mapped:
-- "restaurant" -> main_room,luna_lounge
-- "performance" or "entertainment" -> show
-- "tables" -> table
+IMPORTANT: The user may ask in English, French, Spanish, or any language. Look for keywords like:
+- "photo", "photos", "picture", "pictures", "image", "images", "pic", "pics"
+- "voir", "montrer", "show me", "can I see", "voudrais voir"
+- "restaurant", "lounge", "bar", "show", "spectacle", "table", "salle", "ambiance"
+
+Return ONLY ONE of these options:
+1. "none" -> user is NOT asking for photos/pictures/images
+2. Comma-separated canonical keys: "luna_lounge", "main_room", "show", "table"
+3. "all" -> user wants to see all photos / everything
 
 Examples:
 "show me your restaurant" -> main_room,luna_lounge
 "photos of the show" -> show
 "can I see the lounge" -> luna_lounge
+"des photos du spectacle" -> show
 "table pictures" -> table
+"montrez-moi le restaurant" -> main_room,luna_lounge
 "I want to see everything" -> all
+"voir des photos" -> all
 "what are your opening hours" -> none
+"tell me about your menu" -> none
 
-Response:`;
+Response (only canonical keys or "none" or "all"):`;
 
         const result = await agent.generate(prompt);
         let response: string = (result.text || 'none').trim().toLowerCase();
 
-        console.log(`📸 Photo detection raw response for "${message}": ${response}`);
+        console.log(`📸 Photo detection raw response for "${message.substring(0, 50)}...": ${response}`);
 
-        if (response === 'none') {
+        if (response === 'none' || response.includes('none')) {
             return undefined;
         }
 
@@ -1085,7 +1098,9 @@ Response:`;
             .replace(/\bperformance\b/g, 'show')
             .replace(/\bentertainment\b/g, 'show')
             .replace(/\bdancers?\b/g, 'show')
-            .replace(/\btables?\b/g, 'table');
+            .replace(/\bspectacle\b/g, 'show')
+            .replace(/\btables?\b/g, 'table')
+            .replace(/\bvenue\b/g, 'main_room,luna_lounge');
 
         const parts: string[] = response
             .split(',')
@@ -1101,6 +1116,7 @@ Response:`;
 
         // Si rien de valide
         if (!selection.luna_lounge && !selection.main_room && !selection.show && !selection.table) {
+            console.log(`📸 No valid photo selection detected, returning undefined`);
             return undefined;
         }
 
