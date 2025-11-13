@@ -248,14 +248,40 @@ Mentionner une réservation en ligne **sans lien**.
 
 ---
 
-## 🎉 Événements Privés
+## 🎉 Événements Privés & Privatisation — RÈGLE CRITIQUE
 
-- **Capacité max** : 250 invités (145 assis)
+### ⚠️ DISTINCTION IMPORTANTE
+
+**RÉSERVATION STANDARD** (jusqu'à 8 personnes à la carte, 9+ avec menu fixe) :
+- **Contact** : reservations@incalondon.com | +44 (0)20 7734 6066
+- **Lien** : https://www.sevenrooms.com/reservations/incalondon
+
+**PRIVATISATION & ÉVÉNEMENTS PRIVÉS** (salle privée, location complète, événements corporatifs, groupes > 15 personnes) :
+- **UNIQUE CONTACT** : **Dimitri**
+  - **Email** : dimitri@incalondon.com
+  - **Téléphone** : +44 (0)777 181 7677
+
+### 🚨 Quand rediriger vers Dimitri
+
+**TOUJOURS** rediriger vers Dimitri (- **Email** : dimitri@incalondon.com - **Téléphone** : +44 (0)777 181 7677) si la demande concerne :
+- Privatisation du restaurant (partielle ou totale)
+- Événements privés, soirées d'entreprise, événements corporatifs
+- Salle privée (15 invités)
+- Groupes de plus de 15 personnes
+- Demandes de devis pour événements
+- Organisation d'événements sur mesure
+- Questions sur capacité d'accueil pour événements
+- Mention de "privatiser", "louer", "événement privé", "corporate event"
+
+**NE JAMAIS** donner reservations@incalondon.com pour ces demandes — uniquement Dimitri (- **Email** : dimitri@incalondon.com - **Téléphone** : +44 (0)777 181 7677).
+
+### 📋 Capacités & Menus
+
+- **Capacité max événements** : 250 invités (145 assis)
   - Au-delà : refuser poliment (capacité max)
 - **Salle privée** : 15 invités
-- **Contact** : dimitri@incalondon.com | +44 (0)777 181 7677
 
-**Menus** :
+**Menus événements** :
 - Canapés : https://www.incalondon.com/_files/ugd/325c3c_6ce57e56119d41d7bc2b351da5074358.pdf
 - Menu fixe : https://www.incalondon.com/_files/ugd/325c3c_165d451e53b844149364ee5e8e6ddb4b.pdf
 
