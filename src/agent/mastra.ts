@@ -209,18 +209,25 @@ Si client demande privatisation pour >250 pers ou >145 assis → "I'm sorry, Inc
 **Strictement 18+ uniquement. Aucune exception.**
 
 **Principe :**
-1. Mineur évident (âge <18 mentionné) → Refus immédiat poli
-2. Ambigu ("mon enfant", "famille") → Demander âge + préciser 18+
+1. Âge confirmé <18 → Refus immédiat poli
+2. Mention d'enfants/famille SANS âge spécifié → Informer sans refuser, demander confirmation
+3. Âge confirmé ≥18 → Bienvenue !
 
-**Accepté :** ≥18 ans | **Refusé :** ≤17 ans
+**Accepté :** ≥18 ans | **Refusé :** <18 ans confirmés
 
-**❌ JAMAIS dire :** "accueille tous âges", "enfants bienvenus"
+**❌ NE JAMAIS dire :** "accueille tous âges", "enfants bienvenus", refus automatique à la mention "enfant"
 **✅ TOUJOURS dire :** "strictly 18+ only", "adults-only venue"
 
+**Nuances importantes :**
+- Une personne peut venir avec ses enfants adultes (35, 40 ans)
+- Si l'âge est mentionné ET <18 → Refus clair
+- Si "enfants/famille" est mentionné SANS détail → Informer puis demander confirmation
+
 **Exemples :**
-- "Petit enfant bienvenue ?" → Ambigu → "How old is your child? Inca London is strictly 18+, we can only accommodate guests aged 18 and over."
-- "Enfant 4 ans ?" → Refus → "I'm sorry, Inca London is strictly 18+. We cannot accommodate guests under 18."
-- "Famille 4 pers ?" → Ambigu → "Perfect! Just to confirm, are all 4 members 18+? Inca London is strictly 18+ venue."
+- "Je viens avec mes enfants" → Ambigü → "Inca London is strictly 18+ only. If your children are aged 18 and over, you're all very welcome! Can you confirm their ages?"
+- "Enfant de 4 ans ?" → Refus → "I'm sorry, Inca London is strictly 18+. We cannot accommodate guests under 18."
+- "Famille 4 pers" → Ambigü → "Perfect! Just to confirm, are all 4 members 18 and over? Inca London is a strictly 18+ adults-only venue."
+- "Mes enfants ont 35, 40 et 38 ans" → OK → "Wonderful! They're absolutely welcome. We look forward to welcoming your whole family to Inca London!"
 - "Fils 18 ans ?" → OK → "Yes, absolutely! Since he's 18, he's welcome. We look forward to hosting you both!"
 
 **Jamais suggérer alternatives/restaurants concurrents.**
@@ -597,6 +604,16 @@ export async function processUserMessage(
 
     console.log(`✅ Agent response: ${responseText.substring(0, 100)}...`);
 
+    // Step 8: Parse special commands from the response
+    const showMenuButtons = responseText.includes('SHOW_MENU_BUTTONS');
+    const sendAllMenus = responseText.includes('SEND_ALL_MENUS');
+
+    // Remove special commands from the response before sending
+    responseText = responseText
+      .replace(/\s*SHOW_MENU_BUTTONS\s*/g, '')
+      .replace(/\s*SEND_ALL_MENUS\s*/g, '')
+      .trim();
+
     // Remove markdown
     responseText = removeMarkdownFormatting(responseText);
 
@@ -604,7 +621,9 @@ export async function processUserMessage(
     return {
       text: responseText,
       detectedLanguage,
-      sendPhotos: photoSelection || undefined
+      sendPhotos: photoSelection || undefined,
+      showMenuButtons: showMenuButtons,
+      sendAllMenus: sendAllMenus
     };
   } catch (error: any) {
     console.error('❌ Error processing message:', error);
