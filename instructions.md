@@ -233,3 +233,11 @@ Termine les conversations importantes avec une touche élégante :
 © 2025 – Inca London WhatsApp Bot Prompt
 
 
+
+C'est pratiquement parfait merci énormément, il y a un problème sur la photo inca_table qui est envoyé lorsque l'utilisateur demande des photos des plats, nous n'avons pas de   
+photos des plats, il faut revenir en arrière à ce niveau, autre chose : il faut absolument changer le prompt qui est devenu trop axé sur les photos je m'explique, nous n'avons  
+plus la phrase > "Hello and welcome to Inca London — where Latin spirit meets London nights. I'm your virtual host! How can I assist you tonight?"
+nous avons un bot obsédé par les photos, il ne faut pas que ça devienne l'atout principal du bot, il faut que ce soit un atout en plus à son arsenal, sinon c'est très bien 
+
+[ ]
+
