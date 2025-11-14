@@ -610,14 +610,17 @@ async function processIncomingMessage(
 
     // Send text response
     if (agentResponse.text && agentResponse.text.trim().length > 0) {
-      await whatsappClient.sendTextMessage(userId, agentResponse.text);
+      // Clean up any placeholders like [Photo du Show], [Image], etc.
+      let cleanedText = agentResponse.text.replace(/\s*\[.*?\]\s*/g, ' ').trim();
+
+      await whatsappClient.sendTextMessage(userId, cleanedText);
 
       await database.saveMessage({
         conversation_id: conversation.id,
         direction: 'out',
         sender: 'bot',
         message_type: 'text',
-        text_content: agentResponse.text
+        text_content: cleanedText
       });
 
       console.log(`✅ Text response sent to ${userId}`);
