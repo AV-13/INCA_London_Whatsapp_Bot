@@ -195,71 +195,84 @@ Translation:`;
 }
 
 /**
- * Detect if user is asking for photos based on keywords
+ * Intelligently detect if user is asking for photos using AI
+ * Let the model understand the actual intent, not just keywords
  */
-export function detectPhotoRequestByKeywords(message: string): IncaPhotoSelection | undefined {
-  const lowerMessage = message.toLowerCase();
+export async function detectPhotoRequestWithAI(
+  mastra: Mastra,
+  message: string
+): Promise<IncaPhotoSelection | undefined> {
+  try {
+    const agent = getIncaAgent(mastra);
 
-  // Keywords for each photo category
-  const lunaKeywords = ['lounge', 'luna', 'bar', 'cocktails', 'drinks area', 'lounge area'];
-  const mainRoomKeywords = ['restaurant', 'dining room', 'dining', 'main room', 'interior', 'ambiance', 'décor'];
-  const showKeywords = ['show', 'spectacle', 'performance', 'dancers', 'entertainment', 'stage', 'live'];
-  const tableKeywords = ['table', 'seating', 'setting', 'seats'];
+    const prompt = `Analyze this user message to determine if they are asking for photos of the restaurant, and which type.
 
-  // General photo keywords
-  const generalPhotoKeywords = ['photo', 'picture', 'image', 'see', 'look', 'view', 'show me'];
+User message: "${message}"
 
-  // Check if it's a photo request at all
-  const isPhotoRequest = generalPhotoKeywords.some(keyword => lowerMessage.includes(keyword));
+Determine:
+1. Is the user asking to SEE something about Inca London? (asking for photos, wanting to see how something looks, curious about appearance, etc.)
+2. If yes, what do they want to see?
 
-  if (!isPhotoRequest) {
+Available photo categories:
+- luna_lounge: The lounge/bar area, cocktail area, Luna Club
+- main_room: Main dining room, restaurant interior, general ambiance/décor
+- show: The show/performance, dancers, entertainment, stage
+- table: Table setting, plate presentation, elegant table decor
+
+IMPORTANT: Only suggest photos if the user is EXPLICITLY asking to see something. Don't suggest photos just because they mention the restaurant casually.
+
+Examples of YES (user wants photos):
+- "What do the dishes look like?" -> table (plate presentation)
+- "Can I see the lounge?" -> luna_lounge
+- "How is the dining room?" -> main_room
+- "What kind of show do you have?" -> show
+- "Show me your venue" -> main_room,luna_lounge
+- "I want to see how it looks" -> main_room,show
+
+Examples of NO (don't send photos):
+- "What are your hours?" -> none (not asking for photos)
+- "Tell me about your menu" -> none (not asking to see visually)
+- "I'm coming next week" -> none (casual mention, not asking for photos)
+- "Do you have vegetarian options?" -> none (not about appearance)
+
+Respond with ONLY one of:
+- "none" if they're not asking for photos
+- A comma-separated list of categories if they are asking (e.g., "main_room", "luna_lounge,show", "table", etc.)
+
+Response:`;
+
+    const result = await agent.generate(prompt);
+    const response = (result.text || 'none').trim().toLowerCase();
+
+    console.log(`📸 AI Photo detection: "${message}" => "${response}"`);
+
+    if (response === 'none' || response.includes('none')) {
+      return undefined;
+    }
+
+    // Parse the response
+    const categories = response
+      .split(',')
+      .map((c: string) => c.trim())
+      .filter((c: string) => ['luna_lounge', 'main_room', 'show', 'table'].includes(c));
+
+    if (categories.length === 0) {
+      return undefined;
+    }
+
+    const selection: IncaPhotoSelection = {
+      luna_lounge: categories.includes('luna_lounge'),
+      main_room: categories.includes('main_room'),
+      show: categories.includes('show'),
+      table: categories.includes('table')
+    };
+
+    console.log(`📸 Photo selection determined: ${JSON.stringify(selection)}`);
+    return selection;
+  } catch (error: any) {
+    console.error('❌ Error detecting photo request:', error);
     return undefined;
   }
-
-  // Determine which photos to send
-  const selection: IncaPhotoSelection = {};
-
-  if (
-    lunaKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-    (isPhotoRequest && (lowerMessage.includes('lounge') || lowerMessage.includes('bar')))
-  ) {
-    selection.luna_lounge = true;
-  }
-
-  if (
-    mainRoomKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-    (isPhotoRequest && (lowerMessage.includes('restaurant') || lowerMessage.includes('dining') || lowerMessage.includes('interior')))
-  ) {
-    selection.main_room = true;
-  }
-
-  if (
-    showKeywords.some(keyword => lowerMessage.includes(keyword)) ||
-    (isPhotoRequest && (lowerMessage.includes('show') || lowerMessage.includes('performance') || lowerMessage.includes('entertainment')))
-  ) {
-    selection.show = true;
-  }
-
-  if (tableKeywords.some(keyword => lowerMessage.includes(keyword))) {
-    selection.table = true;
-  }
-
-  // If user says "everything", "all", or just "photos" without specifics, send main room + show
-  if ((isPhotoRequest && Object.keys(selection).length === 0) || lowerMessage.includes('all')) {
-    return {
-      luna_lounge: true,
-      main_room: true,
-      show: true,
-      table: lowerMessage.includes('table')
-    };
-  }
-
-  // If we detected something, return it
-  if (Object.values(selection).some(v => v)) {
-    return selection;
-  }
-
-  return undefined;
 }
 
 /**
@@ -296,8 +309,8 @@ export async function processUserMessage(
     // Step 2: Translate to English for processing
     const englishMessage = await translateToEnglish(mastra, userMessage, detectedLanguage);
 
-    // Step 3: Detect if asking for photos
-    const photoSelection = detectPhotoRequestByKeywords(englishMessage);
+    // Step 3: Intelligently detect if asking for photos (using AI, not keywords)
+    const photoSelection = await detectPhotoRequestWithAI(mastra, englishMessage);
 
     // Step 4: Build context
     let contextPrompt = englishMessage;
