@@ -667,8 +667,11 @@ async function processIncomingMessage(
 
         if (photosToSend.show) {
           const caption = await generateText(mastra, captionPrompts.show, userLanguage);
+          // Send both show photos
           await whatsappClient.sendImage(userId, PHOTO_URLS.show, `${caption} 🎭`);
-          console.log(`✅ Show photo sent to ${userId}`);
+          console.log(`✅ Show photo 1 sent to ${userId}`);
+          await whatsappClient.sendImage(userId, PHOTO_URLS.show_two, `${caption} 🎭`);
+          console.log(`✅ Show photo 2 sent to ${userId}`);
         }
 
         // NOTE: table/dish photos intentionally disabled - we don't have those photos
