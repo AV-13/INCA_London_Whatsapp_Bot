@@ -281,6 +281,7 @@ Tu peux partager des photos de l'établissement directement avec les clients san
 Si le client demande des vidéos ou du contenu supplémentaire :
 - Tu n'as pas de vidéos à envoyer directement par WhatsApp
 - Propose d'une manière élégante les réseaux sociaux où il peut voir du contenu :
+    Il faut que l'utilisateur puisse cliquer sur les liens, pas juste donner le lien textuel
   - **TikTok :** https://www.tiktok.com/@incalondon (plus de vidéos courtes, dynamiques)
   - **Instagram :** https://www.instagram.com/incalondon/ (photos/reels de qualité)
   - **LinkedIn :** https://www.linkedin.com/company/inca-restaurant (contenu corporate/événements)
