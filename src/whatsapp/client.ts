@@ -143,25 +143,34 @@ export class WhatsAppClient {
     caption?: string
   ): Promise<WhatsAppResponse> {
     try {
-      const payload = {
+      const payload: any = {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
         to,
         type: 'image',
         image: {
           link: imageUrl,
-          ...(caption && { caption }),
         },
       };
 
+      // Add caption if provided
+      if (caption) {
+        payload.image.caption = caption;
+      }
+
       console.log(`📤 Sending image to ${to}${caption ? ` with caption: ${caption.substring(0, 30)}...` : ''}`);
+      console.log(`📋 Payload:`, JSON.stringify(payload, null, 2));
 
       const response = await this.client.post('/messages', payload);
 
       console.log('✅ Image sent successfully');
       return response.data;
     } catch (error: any) {
-      console.error('❌ Error sending WhatsApp image:', error.response?.data || error.message);
+      const errorDetails = error.response?.data || error.message;
+      console.error('❌ Error sending WhatsApp image:');
+      console.error('   Status:', error.response?.status);
+      console.error('   Error details:', JSON.stringify(errorDetails, null, 2));
+      console.error('   Full error:', error.message);
       throw new Error(`Failed to send WhatsApp image: ${error.message}`);
     }
   }

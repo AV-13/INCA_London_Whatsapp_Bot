@@ -221,3 +221,16 @@ Oublier l'idée du formulaire
 
 
 Rajouter images, liens réseaux.
+réseaux : linkedin => https://www.linkedin.com/company/inca-restaurant
+instagram => https://www.instagram.com/incalondon/
+tiktok => https://www.tiktok.com/@incalondon
+il faut modifier le prompt pour que le bot puisse les fournir sur demande. (demande de vidéos, ou de photos supplémentaires)
+Les réponses concernant les photos sont bizarres et pas encore satisfaisantes :
+
+Réponse non satisfaisantes : "Demande une photo" Bot: "Je peux vous envoyer des photos pour vous donner un aperçu. Souhaitez-vous voir des images de la salle principale ou du bar ? :spectacle:" et envoie directement la photo. Dis pas à l'user que tu peux envoyer des photos, envoie les directement si demandé.
+
+Je suis ravi que cela vous plaise ! En plus de la salle principale, je peux vous montrer des photos du bar/lounge et des spectacles en direct. Cela vous donnera une meilleure idée de l'ambiance d'Inca London. Souhaitez-vous voir ces images ? :tada:
+14 h 49
+Je suis ravi de votre enthousiasme ! Voici une photo du bar/lounge, qui reflète parfaitement l'ambiance sophistiquée d'Inca London.
+Et maintenant, voici quelques images des spectacles en direct, qui capturent l'énergie et l'animation de nos performances. 
+Sachant que chaque image a déjà une description je trouve le message qui précede l'envoi de la photo trop lourd et redondant.

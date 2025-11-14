@@ -5,6 +5,10 @@
  * SIMPLIFIED VERSION - Menus only, no reservation flow
  */
 
+// Load environment variables FIRST (before any other logic)
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { Request, Response } from 'express';
 import { WhatsAppClient } from './client.js';
 import { Mastra } from '@mastra/core';
@@ -28,9 +32,31 @@ import { generateLocationResponse, INCA_LONDON_LOCATION, type LocationData } fro
 const processedMessages = new Set<string>();
 const MESSAGE_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-// Base publique pour les assets (peut être surchargée par la variable d'environnement BASE_URL)
-const PHOTO_BASE_URL =
-    (process.env.BASE_URL ? process.env.BASE_URL.replace(/\/+$/, '') : 'https://inca-london-wa-bot-av-dvhtghakgxaaetds.francecentral-01.azurewebsites.net');
+/**
+ * Determine base URL for photo assets based on environment
+ * - Production: Use Azure App Service URL
+ * - Development: Use ngrok URL (from BASE_URL env var) or local http://localhost:3000
+ */
+function getPhotoBaseUrl(): string {
+  // If BASE_URL is explicitly set (ngrok or custom), use it
+    console.log("GET BASE PHOTO URL : ", process.env.BASE_URL);
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL.replace(/\/+$/, '');
+  }
+
+  // If NODE_ENV is production, use Azure URL
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://inca-london-wa-bot-av-dvhtghakgxaaetds.francecentral-01.azurewebsites.net';
+  }
+
+  // Default for local development (without ngrok)
+  return `http://localhost:${process.env.PORT || 3000}`;
+}
+
+const PHOTO_BASE_URL = getPhotoBaseUrl();
+
+// Log which URL is being used
+console.log(`🖼️ Photo base URL: ${PHOTO_BASE_URL}`);
 
 // Chemin racine des photos statiques
 const PHOTO_ASSET_PATH = '/assets/photos';
@@ -671,10 +697,19 @@ async function processIncomingMessage(
         if (photosToSend.show) {
           const caption = await generateText(mastra, captionPrompts.show, userLanguage);
           // Send both show photos
-          await whatsappClient.sendImage(userId, PHOTO_URLS.show, `${caption} 🎭`);
-          console.log(`✅ Show photo 1 sent to ${userId}`);
-          await whatsappClient.sendImage(userId, PHOTO_URLS.show_two, `${caption} 🎭`);
-          console.log(`✅ Show photo 2 sent to ${userId}`);
+          try {
+            await whatsappClient.sendImage(userId, PHOTO_URLS.show, `${caption} 🎭`);
+            console.log(`✅ Show photo 1 sent to ${userId}`);
+          } catch (err: any) {
+            console.error(`❌ Failed to send show photo 1: ${err.message}`);
+          }
+
+          try {
+            await whatsappClient.sendImage(userId, PHOTO_URLS.show_two, `${caption} 🎭`);
+            console.log(`✅ Show photo 2 sent to ${userId}`);
+          } catch (err: any) {
+            console.error(`❌ Failed to send show photo 2: ${err.message}`);
+          }
         }
 
         // NOTE: table/dish photos intentionally disabled - we don't have those photos

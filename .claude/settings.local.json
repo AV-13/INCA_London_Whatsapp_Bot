@@ -30,7 +30,8 @@
       "Bash(git push:*)",
       "Bash(ls:*)",
       "Bash(dir \"C:\\Users\\augus\\WebstormProjects\\Inca_London\\assets\")",
-      "Bash(dir \"C:\\Users\\augus\\WebstormProjects\\Inca_London\\assets\\photos\")"
+      "Bash(dir \"C:\\Users\\augus\\WebstormProjects\\Inca_London\\assets\\photos\")",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
