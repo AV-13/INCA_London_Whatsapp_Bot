@@ -36,13 +36,14 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from assets folder (for PDF menus)
+// Serve static files from assets folder (for PDF menus and photos)
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const assetsPath = join(__dirname, '..', 'assets');
 app.use('/menus', express.static(assetsPath));
+app.use('/assets', express.static(assetsPath));
 
 // Request logging middleware
 app.use((req, res, next) => {
