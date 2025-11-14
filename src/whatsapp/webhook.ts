@@ -649,8 +649,7 @@ async function processIncomingMessage(
         const captionPrompts = {
           luna_lounge: 'A short elegant caption for the Luna Lounge bar area in 5-8 words',
           main_room: 'A short elegant caption for the main dining room in 5-8 words',
-          show: 'A short elegant caption for the show/performance in 5-8 words',
-          table: 'A short elegant caption for the elegant table setting in 5-8 words'
+          show: 'A short elegant caption for the show/performance in 5-8 words'
         };
 
         // Send photos based on request with generated captions
@@ -672,11 +671,7 @@ async function processIncomingMessage(
           console.log(`✅ Show photo sent to ${userId}`);
         }
 
-        if (photosToSend.table) {
-          const caption = await generateText(mastra, captionPrompts.table, userLanguage);
-          await whatsappClient.sendImage(userId, PHOTO_URLS.table, `${caption} ✨`);
-          console.log(`✅ Table photo sent to ${userId}`);
-        }
+        // NOTE: table/dish photos intentionally disabled - we don't have those photos
 
         console.log(`📸 Photo sending complete for ${userId}`);
       } catch (photoError: any) {
