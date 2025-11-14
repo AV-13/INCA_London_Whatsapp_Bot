@@ -639,67 +639,51 @@ async function processIncomingMessage(
         console.log(`✅ Location pin sent to ${userId}`);
       }
     }
-      // Send photos if user explicitly requested them
-      if (agentResponse.sendPhotos) {
-          console.log(`📸 User requested photos, determining which photos to send...`);
-          const photosToSend = agentResponse.sendPhotos;
+    // Send photos if user explicitly requested them
+    if (agentResponse.sendPhotos && Object.keys(agentResponse.sendPhotos).length > 0) {
+      console.log(`📸 User requested photos, sending: ${JSON.stringify(agentResponse.sendPhotos)}`);
+      const photosToSend = agentResponse.sendPhotos;
 
-          try {
-              // Generate captions in user's language
-              const lunaCaption = await generateText(
-                  mastra,
-                  'Photo caption for Luna Lounge area (max 10 words)',
-                  userLanguage,
-                  'Short photo caption for lounge'
-              );
+      try {
+        // Generate captions in user's language
+        const captionPrompts = {
+          luna_lounge: 'A short elegant caption for the Luna Lounge bar area in 5-8 words',
+          main_room: 'A short elegant caption for the main dining room in 5-8 words',
+          show: 'A short elegant caption for the show/performance in 5-8 words',
+          table: 'A short elegant caption for the elegant table setting in 5-8 words'
+        };
 
-              const mainRoomCaption = await generateText(
-                  mastra,
-                  'Photo caption for main dining room (max 10 words)',
-                  userLanguage,
-                  'Short photo caption for main room'
-              );
+        // Send photos based on request with generated captions
+        if (photosToSend.luna_lounge) {
+          const caption = await generateText(mastra, captionPrompts.luna_lounge, userLanguage);
+          await whatsappClient.sendImage(userId, PHOTO_URLS.luna_lounge, `${caption} 🌙`);
+          console.log(`✅ Luna Lounge photo sent to ${userId}`);
+        }
 
-              const showCaption = await generateText(
-                  mastra,
-                  'Photo caption for show/performance area (max 10 words)',
-                  userLanguage,
-                  'Short photo caption for show area'
-              );
+        if (photosToSend.main_room) {
+          const caption = await generateText(mastra, captionPrompts.main_room, userLanguage);
+          await whatsappClient.sendImage(userId, PHOTO_URLS.main_room, `${caption} 🍽️`);
+          console.log(`✅ Main room photo sent to ${userId}`);
+        }
 
-              const tableCaption = await generateText(
-                  mastra,
-                  'Photo caption for elegant table setting (max 10 words)',
-                  userLanguage,
-                  'Short photo caption for table'
-              );
+        if (photosToSend.show) {
+          const caption = await generateText(mastra, captionPrompts.show, userLanguage);
+          await whatsappClient.sendImage(userId, PHOTO_URLS.show, `${caption} 🎭`);
+          console.log(`✅ Show photo sent to ${userId}`);
+        }
 
-              // Send photos based on request
-              if (photosToSend.luna_lounge) {
-                  await whatsappClient.sendImage(userId, PHOTO_URLS.luna_lounge, `${lunaCaption} 🌙`);
-                  console.log(`✅ Luna Lounge photo sent to ${userId}`);
-              }
+        if (photosToSend.table) {
+          const caption = await generateText(mastra, captionPrompts.table, userLanguage);
+          await whatsappClient.sendImage(userId, PHOTO_URLS.table, `${caption} ✨`);
+          console.log(`✅ Table photo sent to ${userId}`);
+        }
 
-              if (photosToSend.main_room) {
-                  await whatsappClient.sendImage(userId, PHOTO_URLS.main_room, `${mainRoomCaption} 🍽️`);
-                  console.log(`✅ Main room photo sent to ${userId}`);
-              }
-
-              if (photosToSend.show) {
-                  await whatsappClient.sendImage(userId, PHOTO_URLS.show, `${showCaption} 🎭`);
-                  console.log(`✅ Show photo sent to ${userId}`);
-              }
-
-              if (photosToSend.table) {
-                  await whatsappClient.sendImage(userId, PHOTO_URLS.table, `${tableCaption} ✨`);
-                  console.log(`✅ Table photo sent to ${userId}`);
-              }
-
-              console.log(`📸 Photo sending complete for ${userId}`);
-          } catch (photoError: any) {
-              console.error('❌ Error sending photos:', photoError);
-          }
+        console.log(`📸 Photo sending complete for ${userId}`);
+      } catch (photoError: any) {
+        console.error('❌ Error sending photos:', photoError);
+        // Continue execution even if photo sending fails
       }
+    }
 
     console.log(`✅ Processing complete for ${userId}`);
   } catch (error: any) {

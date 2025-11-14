@@ -674,10 +674,44 @@ Informations détaillées sur le spectacle :
 - **La fiabilité, la clarté et la pédagogie passent avant la rapidité**
 
 ---
+
+## 📸 Photos du restaurant — RÈGLE CRITIQUE
+
+### Tu PEUX envoyer des photos du restaurant
+
+**Si on demande des photos du restaurant, de l'ambiance, de la décoration, des espaces** :
+
+1. Répondre naturellement que tu vas envoyer des photos
+2. Inclure une commande spéciale dans ta réponse pour déclencher l'envoi
+
+**Photos disponibles (clés canoniques)** :
+- "luna_lounge" : bar, lounge area, cocktails, Luna Club
+- "main_room" : main dining room, salle principale, ambiance, restaurant interior
+- "show" : show, spectacle, performances, danseurs, entertainment, stage
+- "table" : table setting, elegant table, dinner table decor, tables décorées
+
+**Comment déclencher l'envoi de photos** :
+
+Ajoute à la fin de ta réponse (après ton texte naturel) :
+- SEND_PHOTOS:luna_lounge,main_room (pour certaines photos spécifiques)
+- SEND_PHOTOS:show (pour une seule photo)
+- SEND_PHOTOS:all (pour toutes les photos du restaurant)
+
+**Exemples** :
+
+> "Of course! Let me show you our beautiful Luna Lounge 📸 SEND_PHOTOS:luna_lounge"
+
+> "Here's a glimpse of our stunning venue 🎭 SEND_PHOTOS:main_room,show"
+
+> "I'd love to show you our restaurant! SEND_PHOTOS:all"
+
 **RÈGLES ABSOLUES :**
-- ❌ Ne JAMAIS écrire "[photo]", "[insert photo]", "here's the photo", ou toute mention d'envoi de photo
-- ✅ Proposer une description appétissante et détaillée basée sur les menus existants
-- ✅ Ne pas inventer de détails
+- ✅ Utilise TOUJOURS la commande SEND_PHOTOS: suivie des clés canoniques
+- ✅ Choisis les photos pertinentes selon la demande (pas toujours "all")
+- ✅ Reste naturel dans ta réponse avant la commande
+- ❌ Ne JAMAIS écrire "[photo]", "[insert photo]" ou utiliser du markdown pour les images
+- ❌ N'invente JAMAIS de photos de plats - tu n'as que des photos du restaurant/ambiance
+- ✅ Si on demande des photos de PLATS spécifiquement, propose plutôt le menu PDF (pas de photos de plats disponibles)
 
 ---
 
@@ -969,17 +1003,55 @@ export async function processUserMessage(
       };
     }
 
+    // Check if the agent wants to send photos (special command from AI)
+    const photoCommandMatch = responseText.match(/SEND_PHOTOS:([a-z_,]+)/i);
+
+    if (photoCommandMatch) {
+      console.log('📸 Agent requested photos via command:', photoCommandMatch[0]);
+
+      // Parse the photo keys from the command
+      const photoKeys = photoCommandMatch[1].toLowerCase();
+      let photoSelection: IncaPhotoSelection = {};
+
+      if (photoKeys === 'all') {
+        photoSelection = {
+          luna_lounge: true,
+          main_room: true,
+          show: true,
+          table: true
+        };
+      } else {
+        const keys = photoKeys.split(',').map((k: string) => k.trim());
+        photoSelection = {
+          luna_lounge: keys.includes('luna_lounge'),
+          main_room: keys.includes('main_room'),
+          show: keys.includes('show'),
+          table: keys.includes('table')
+        };
+      }
+
+      // Remove the command from the response text
+      responseText = responseText.replace(photoCommandMatch[0], '').trim();
+
+      // Supprimer le formatage markdown
+      responseText = removeMarkdownFormatting(responseText);
+
+      console.log('📸 Photo selection parsed:', JSON.stringify(photoSelection));
+
+      return {
+        text: responseText,
+        detectedLanguage,
+        sendPhotos: photoSelection
+      };
+    }
+
     // Supprimer le formatage markdown des réponses
     responseText = removeMarkdownFormatting(responseText);
 
     console.log("📝 Final response text:", responseText.substring(0, 100) + '...');
 
-    // Translate message to English for photo detection
-    const englishMessage = await translateToEnglish(mastra, userMessage, detectedLanguage);
-    const photoSelection = await detectPhotoRequest(mastra, englishMessage);
     return {
       text: responseText,
-      sendPhotos: photoSelection,
       detectedLanguage,
     };
   } catch (error: any) {
@@ -1013,93 +1085,6 @@ function removeMarkdownFormatting(text: string): string {
   text = text.replace(/~~(.+?)~~/g, '$1');
 
   return text;
-}
-// Ajoutez ceci dans `src/whatsapp/webhook.ts` (ou un utilitaire partagé)
-
-/**
- * Détecte si l'utilisateur veut des photos et lesquelles (INCA)
- * @param mastra Instance Mastra
- * @param message Message utilisateur déjà traduit en anglais
- * @returns Objet de sélection ou undefined si aucune demande
- */
-export async function detectPhotoRequest(
-    mastra: Mastra,
-    message: string
-): Promise<{ luna_lounge?: boolean; main_room?: boolean; show?: boolean; table?: boolean } | undefined> {
-    try {
-        const agent = getIncaAgent(mastra);
-
-        const prompt = `Analyze the user message and decide if they want to see PHOTOS of the INCA London venue.
-User message: "${message}"
-
-Available photo categories:
-- luna_lounge: lounge / bar / cocktails / lounge area / lounge pictures
-- main_room: main dining room / restaurant / interior / ambiance / dining room
-- show: show / performance / dancers / entertainment / stage / dancers pictures / live performance
-- table: table setting / table / dinner table / table decor / table pictures / seating
-
-IMPORTANT: Be lenient! If the user:
-- Asks to "see" something about the restaurant → include relevant photos
-- Asks "what does it look like" → include main_room + show
-- Asks about the "ambiance" → include main_room + luna_lounge
-- Asks "show me photos" → include ALL (luna_lounge,main_room,show,table)
-- Asks "what's it like" → include main_room + show
-
-Return ONLY ONE line with:
-1. "none" -> user is NOT asking for photos
-2. One or more categories separated by commas (e.g. "luna_lounge,main_room" or "show" or "all")
-3. "all" -> send everything
-
-Examples:
-"show me your restaurant" -> luna_lounge,main_room
-"what's the show like?" -> show
-"can I see the lounge?" -> luna_lounge
-"show me pictures" -> all
-"what does the dining room look like?" -> main_room
-"what are your opening hours?" -> none
-"I want to see how it looks" -> luna_lounge,main_room,show
-"what's the table setting?" -> table
-
-Response (ONLY the categories, nothing else):`;
-
-        const result = await agent.generate(prompt);
-        let response: string = (result.text || 'none').trim().toLowerCase();
-
-        // Nettoyer la réponse - supprimer "all" si présent et le remplacer
-        response = response.replace(/\ball\b/g, 'luna_lounge,main_room,show,table');
-
-        console.log(`📸 Photo detection raw response for "${message}": ${response}`);
-
-        if (response.includes('none') || response.trim() === '') {
-            console.log(`📸 No photos requested`);
-            return undefined;
-        }
-
-        // Parser les catégories
-        const parts: string[] = response
-            .split(',')
-            .map(p => p.trim())
-            .filter(Boolean)
-            .filter(p => ['luna_lounge', 'main_room', 'show', 'table'].includes(p));
-
-        if (parts.length === 0) {
-            console.log(`📸 No valid photo categories found in response`);
-            return undefined;
-        }
-
-        const selection = {
-            luna_lounge: parts.includes('luna_lounge'),
-            main_room: parts.includes('main_room'),
-            show: parts.includes('show'),
-            table: parts.includes('table')
-        };
-
-        console.log(`📸 Photo selection parsed: ${JSON.stringify(selection)}`);
-        return selection;
-    } catch (error: any) {
-        console.error('❌ Error detecting photo request (INCA):', error);
-        return undefined;
-    }
 }
 
 /**
