@@ -674,21 +674,6 @@ Informations détaillées sur le spectacle :
 - **La fiabilité, la clarté et la pédagogie passent avant la rapidité**
 
 ---
-
-## 📸 Photos des plats — RÈGLE CRITIQUE
-
-### Tu NE PEUX PAS envoyer de photos
-
-**Si on demande des photos** :
-
-1. Refuser poliment (pas d'accès images)
-2. Proposer descriptions détaillées
-3. Se baser **uniquement** sur les menus fournis
-
-**Exemple** :
-
-> "I don't have photos, but I can describe the dishes in detail! Our Wagyu Tacos use premium wagyu; the Seabass Ceviche is citrus-cured with Peruvian notes. Want the full menu?"
-
 **RÈGLES ABSOLUES :**
 - ❌ Ne JAMAIS écrire "[photo]", "[insert photo]", "here's the photo", ou toute mention d'envoi de photo
 - ✅ Proposer une description appétissante et détaillée basée sur les menus existants
@@ -988,7 +973,10 @@ export async function processUserMessage(
     responseText = removeMarkdownFormatting(responseText);
 
     console.log("📝 Final response text:", responseText.substring(0, 100) + '...');
-    const photoSelection = await detectPhotoRequest(mastra, userMessage);
+
+    // Translate message to English for photo detection
+    const englishMessage = await translateToEnglish(mastra, userMessage, detectedLanguage);
+    const photoSelection = await detectPhotoRequest(mastra, englishMessage);
     return {
       text: responseText,
       sendPhotos: photoSelection,
@@ -1041,56 +1029,63 @@ export async function detectPhotoRequest(
     try {
         const agent = getIncaAgent(mastra);
 
-        const prompt = `Analyze the user message and decide which PHOTOS of the INCA London venue to show.
+        const prompt = `Analyze the user message and decide if they want to see PHOTOS of the INCA London venue.
 User message: "${message}"
 
-Available photo categories (canonical keys):
-- luna_lounge: lounge / bar / cocktails area
-- main_room: main dining room / general restaurant interior / ambiance
-- show: show / performance / dancers / entertainment / stage
-- table: table setting / elegant table / dinner table decor
+Available photo categories:
+- luna_lounge: lounge / bar / cocktails / lounge area / lounge pictures
+- main_room: main dining room / restaurant / interior / ambiance / dining room
+- show: show / performance / dancers / entertainment / stage / dancers pictures / live performance
+- table: table setting / table / dinner table / table decor / table pictures / seating
 
-Return ONLY ONE of:
-1. "none" -> no photos requested
-2. One or multiple canonical keys separated by commas (e.g. "luna_lounge", "main_room", "show", "table")
-3. "all" -> user wants everything
-You may also use helper tokens that will be mapped:
-- "restaurant" -> main_room,luna_lounge
-- "performance" or "entertainment" -> show
-- "tables" -> table
+IMPORTANT: Be lenient! If the user:
+- Asks to "see" something about the restaurant → include relevant photos
+- Asks "what does it look like" → include main_room + show
+- Asks about the "ambiance" → include main_room + luna_lounge
+- Asks "show me photos" → include ALL (luna_lounge,main_room,show,table)
+- Asks "what's it like" → include main_room + show
+
+Return ONLY ONE line with:
+1. "none" -> user is NOT asking for photos
+2. One or more categories separated by commas (e.g. "luna_lounge,main_room" or "show" or "all")
+3. "all" -> send everything
 
 Examples:
-"show me your restaurant" -> main_room,luna_lounge
-"photos of the show" -> show
-"can I see the lounge" -> luna_lounge
-"table pictures" -> table
-"I want to see everything" -> all
-"what are your opening hours" -> none
+"show me your restaurant" -> luna_lounge,main_room
+"what's the show like?" -> show
+"can I see the lounge?" -> luna_lounge
+"show me pictures" -> all
+"what does the dining room look like?" -> main_room
+"what are your opening hours?" -> none
+"I want to see how it looks" -> luna_lounge,main_room,show
+"what's the table setting?" -> table
 
-Response:`;
+Response (ONLY the categories, nothing else):`;
 
         const result = await agent.generate(prompt);
         let response: string = (result.text || 'none').trim().toLowerCase();
 
+        // Nettoyer la réponse - supprimer "all" si présent et le remplacer
+        response = response.replace(/\ball\b/g, 'luna_lounge,main_room,show,table');
+
         console.log(`📸 Photo detection raw response for "${message}": ${response}`);
 
-        if (response === 'none') {
+        if (response.includes('none') || response.trim() === '') {
+            console.log(`📸 No photos requested`);
             return undefined;
         }
 
-        // Normalisation des tokens spéciaux
-        response = response
-            .replace(/\ball\b/g, 'luna_lounge,main_room,show,table')
-            .replace(/\brestaurant\b/g, 'main_room,luna_lounge')
-            .replace(/\bperformance\b/g, 'show')
-            .replace(/\bentertainment\b/g, 'show')
-            .replace(/\bdancers?\b/g, 'show')
-            .replace(/\btables?\b/g, 'table');
-
+        // Parser les catégories
         const parts: string[] = response
             .split(',')
             .map(p => p.trim())
-            .filter(Boolean);
+            .filter(Boolean)
+            .filter(p => ['luna_lounge', 'main_room', 'show', 'table'].includes(p));
+
+        if (parts.length === 0) {
+            console.log(`📸 No valid photo categories found in response`);
+            return undefined;
+        }
 
         const selection = {
             luna_lounge: parts.includes('luna_lounge'),
@@ -1098,11 +1093,6 @@ Response:`;
             show: parts.includes('show'),
             table: parts.includes('table')
         };
-
-        // Si rien de valide
-        if (!selection.luna_lounge && !selection.main_room && !selection.show && !selection.table) {
-            return undefined;
-        }
 
         console.log(`📸 Photo selection parsed: ${JSON.stringify(selection)}`);
         return selection;
